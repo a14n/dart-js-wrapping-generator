@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-library generator;
+library js_wrapping.dart_generator;
 
 import 'dart:io';
 

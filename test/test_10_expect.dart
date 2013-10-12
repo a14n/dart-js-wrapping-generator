@@ -1,6 +1,6 @@
 import 'dart:js' as js;
 
-import 'package:js_wrapping/generator.dart';
+import 'package:js_wrapping_generator/dart_generator.dart';
 import 'package:js_wrapping/js_wrapping.dart' as jsw;
 
 class Enum extends jsw.IsEnum<int> {
@@ -10,12 +10,14 @@ class Enum extends jsw.IsEnum<int> {
 
   static Enum find(Object o) => _FINDER.find(o);
 
-  Enum._(int value) : super(value);
+  Enum._(int value)
+      : super(value);
 }
 
 class Person extends jsw.TypedJsObject {
   static Person cast(js.JsObject jsObject) => jsObject == null ? null : new Person.fromJsObject(jsObject);
-  Person.fromJsObject(js.JsObject jsObject) : super.fromJsObject(jsObject);
+  Person.fromJsObject(js.JsObject jsObject)
+      : super.fromJsObject(jsObject);
   set f1(String f1) => $unsafe.callMethod('setF1', [f1]);
   String get f1 => $unsafe.callMethod('getF1');
   set s1(String value) => $unsafe.callMethod('setS1', [value]);

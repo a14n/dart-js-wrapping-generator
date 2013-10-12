@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:js_wrapping/generator.dart';
+import 'package:js_wrapping_generator/dart_generator.dart';
 import 'package:unittest/unittest.dart';
 
 main() {
