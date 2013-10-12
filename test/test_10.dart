@@ -17,5 +17,5 @@ class Enum extends jsw.IsEnum<int> {
   String f1;
   set s1(String value);
   Person get g1;
-  @isEnum Enum get g2;
+  Enum get g2;
 }

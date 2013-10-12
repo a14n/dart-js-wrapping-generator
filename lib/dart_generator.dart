@@ -17,15 +17,22 @@ library js_wrapping.dart_generator;
 import 'dart:io';
 
 import 'package:analyzer_experimental/analyzer.dart';
+import 'package:analyzer_experimental/src/generated/element.dart';
+import 'package:analyzer_experimental/src/generated/engine.dart';
+import 'package:analyzer_experimental/src/generated/java_io.dart';
 import 'package:analyzer_experimental/src/generated/scanner.dart';
+import 'package:analyzer_experimental/src/generated/sdk_io.dart';
+import 'package:analyzer_experimental/src/generated/source_io.dart';
 import 'package:analyzer_experimental/src/services/formatter_impl.dart';
 
 import 'package:path/path.dart' as p;
 
-// TODO handle Node and Element
+const _LIBRARY_NAME = 'js_wrapping.dart_generator';
+
 // TODO add @withInstanceOf
 // TODO add @remove to avoid super.method() - see MVCArray
-// TODO don't use cast for type != TypedJsObject @notTypedJsObject
+// TODO handle IsEnum.find
+// TODO don't use cast for type != TypedJsObject
 
 const wrapper = const _Wrapper();
 class _Wrapper {
@@ -59,43 +66,64 @@ class _Generate {
   const _Generate();
 }
 
-const isEnum = const _IsEnum();
-class _IsEnum {
-  const _IsEnum();
-}
+class Generator {
+  String _libraryFile;
+  final _context = AnalysisEngine.instance.createAnalysisContext();
 
-void transformDirectory(Directory from, Directory to) {
-  from.listSync().forEach((FileSystemEntity fse){
-    final name = p.basename(fse.path);
-    final destination = p.join(to.path, name);
-    if (fse is File) {
-      transformFile(fse, new File(destination));
-    } else if (fse is Directory) {
-      final d = new Directory(destination);
-      if (d.existsSync()) d..deleteSync(recursive: true);
-      d.createSync();
-      transformDirectory(fse, d);
-    }
-  });
-}
-
-void transformFile(File from, File to) {
-  final name = p.basename(from.path);
-
-  // reset destination
-  if (to.existsSync()) to..deleteSync();
-  to.createSync();
-
-  // transform
-  final unit = parseDartFile(from.path);
-  final code = from.readAsStringSync();
-  final transformations = _buildTransformations(unit, code);
-  final source = _applyTransformations(code, transformations);
-  try {
-    to.writeAsStringSync(new CodeFormatter().format(CodeKind.COMPILATION_UNIT, source).source);
-  } on FormatterException {
-    to.writeAsStringSync(source);
+  Generator(String packagesDir, this._libraryFile) {
+    _context
+      ..analysisOptions.hint = false
+      ..analysisOptions.strictMode = false
+      ..sourceFactory = new SourceFactory.con2([
+          new DartUriResolver(DirectoryBasedDartSdk.defaultSdk),
+          new FileUriResolver(),
+          new PackageUriResolver(new Directory(packagesDir).listSync().map((e) => new JavaFile(e.path)).toList())]
+      );
   }
+
+  void transformDirectory(Directory from, Directory to) {
+    from.listSync().forEach((FileSystemEntity fse){
+      final name = p.basename(fse.path);
+      final destination = p.join(to.path, name);
+      if (fse is File) {
+        transformFile(fse, new File(destination));
+      } else if (fse is Directory) {
+        final d = new Directory(destination);
+        if (d.existsSync()) d..deleteSync(recursive: true);
+        d.createSync();
+        transformDirectory(fse, d);
+      }
+    });
+  }
+
+  void transformFile(File from, File to) {
+    final name = p.basename(from.path);
+
+    // reset destination
+    if (to.existsSync()) to..deleteSync();
+    to.createSync();
+
+    // transform
+    final unit = parseDartFile(from.path);
+    final code = from.readAsStringSync();
+    final transformations = _buildTransformations(unit, code);
+    final source = _applyTransformations(code, transformations);
+    try {
+      to.writeAsStringSync(new CodeFormatter().format(CodeKind.COMPILATION_UNIT, source).source);
+    } on FormatterException {
+      to.writeAsStringSync(source);
+    }
+  }
+
+  /// Parses a Dart file into an AST.
+  CompilationUnit parseDartFile(String path) {
+    final absolutePath = p.absolute(path);
+    final librarySource = new FileBasedSource.con1(_context.sourceFactory.contentCache, new JavaFile(absolutePath));
+    final fileSource = new FileBasedSource.con1(_context.sourceFactory.contentCache, new JavaFile(absolutePath));
+    final library = _context.computeLibraryElement(librarySource);
+    return _context.resolveCompilationUnit(fileSource, library);
+  }
+
 }
 
 List<_Transformation> _buildTransformations(CompilationUnit unit, String code) {
@@ -146,7 +174,6 @@ List<_Transformation> _buildTransformations(CompilationUnit unit, String code) {
           namesWithUnderscoresOnClass || _hasAnnotation(m, 'namesWithUnderscores') ? namesWithUnderscores : null;
         final generate = _hasAnnotation(m, 'generate');
         _removeMetadata(result, declaration, (m) => m.name.name == 'generate');
-        final isEnum = _hasAnnotation(m, 'isEnum');
         if (m is FieldDeclaration) {
           final content = new StringBuffer();
           final type = m.fields.type;
@@ -157,7 +184,7 @@ List<_Transformation> _buildTransformations(CompilationUnit unit, String code) {
             } else {
               _writeSetter(content, name, null, type, access: access);
               content.write('\n');
-              _writeGetter(content, name, type, isEnum, access: access);
+              _writeGetter(content, name, type, access: access);
               content.write('\n');
             }
           }
@@ -172,13 +199,13 @@ List<_Transformation> _buildTransformations(CompilationUnit unit, String code) {
             final SimpleFormalParameter param = m.parameters.parameters.first;
             _writeSetter(method, m.name.name, m.returnType, param.type, access: access, paramName: param.identifier.name);
           } else if (m.isGetter) {
-            _writeGetter(method, m.name.name, m.returnType, isEnum, access: access);
+            _writeGetter(method, m.name.name, m.returnType, access: access);
           } else {
             if (m.returnType != null) {
               method..write(m.returnType)..write(' ');
             }
             method..write(m.name)..write(m.parameters)..write(_handleReturn("\$unsafe.callMethod('${m.name.name}'" +
-                (m.parameters.parameters.isEmpty ? ")" : ", [${m.parameters.parameters.map(_handleFormalParameter).join(', ')}])"), m.returnType, isEnum));
+                (m.parameters.parameters.isEmpty ? ")" : ", [${m.parameters.parameters.map(_handleFormalParameter).join(', ')}])"), m.returnType));
           }
           result.add(new _Transformation(m.offset, m.end, method.toString()));
         }
@@ -193,24 +220,24 @@ void _writeSetter(StringBuffer sb, String name, TypeName returnType, TypeName pa
   if (returnType != null) sb.write("${returnType} ");
   if (access == forMethods) {
     final nameCapitalized = _capitalize(name);
-    sb.write("set ${name}(${paramType} ${paramName})${_handleReturn("\$unsafe.callMethod('set${nameCapitalized}', [${_handleParameter(paramName, paramType)}])", returnType, false)}");
+    sb.write("set ${name}(${paramType} ${paramName})${_handleReturn("\$unsafe.callMethod('set${nameCapitalized}', [${_handleParameter(paramName, paramType)}])", returnType)}");
   } else if (access == namesWithUnderscores) {
     final nameWithUnderscores = _withUnderscores(name);
-    sb.write("set ${name}(${paramType} ${paramName})${_handleReturn("\$unsafe['${nameWithUnderscores}'] = ${_handleParameter(paramName, paramType)}", returnType, false)}");
+    sb.write("set ${name}(${paramType} ${paramName})${_handleReturn("\$unsafe['${nameWithUnderscores}'] = ${_handleParameter(paramName, paramType)}", returnType)}");
   } else {
-    sb.write("set ${name}(${paramType} ${paramName})${_handleReturn("\$unsafe['${name}'] = ${_handleParameter(paramName, paramType)}", returnType, false)}");
+    sb.write("set ${name}(${paramType} ${paramName})${_handleReturn("\$unsafe['${name}'] = ${_handleParameter(paramName, paramType)}", returnType)}");
   }
 }
 
-void _writeGetter(StringBuffer content, String name, TypeName returnType, bool isEnum, {_PropertyMapping access}) {
+void _writeGetter(StringBuffer content, String name, TypeName returnType, {_PropertyMapping access}) {
   if (access == forMethods) {
     final nameCapitalized = _capitalize(name);
-    content..write("${returnType} get ${name}${_handleReturn("\$unsafe.callMethod('get${nameCapitalized}')", returnType, isEnum)}");
+    content..write("${returnType} get ${name}${_handleReturn("\$unsafe.callMethod('get${nameCapitalized}')", returnType)}");
   } else if (access == namesWithUnderscores) {
     final nameWithUnderscores = _withUnderscores(name);
-    content..write("${returnType} get ${name}${_handleReturn("\$unsafe['${nameWithUnderscores}']", returnType, isEnum)}");
+    content..write("${returnType} get ${name}${_handleReturn("\$unsafe['${nameWithUnderscores}']", returnType)}");
   } else {
-    content..write("${returnType} get ${name}${_handleReturn("\$unsafe['${name}']", returnType, isEnum)}");
+    content..write("${returnType} get ${name}${_handleReturn("\$unsafe['${name}']", returnType)}");
   }
 }
 
@@ -218,53 +245,57 @@ String _handleFormalParameter(FormalParameter fp) => _handleParameter(fp.identif
 
 String _handleParameter(String name, TypeName type) {
   if (type != null) {
-    if (type.name.name == 'List') {
+    if (_isTypedWith(type.type.element, 'dart.core', 'List')) {
       return "${name} == null ? null : ${name} is js.Serializable ? ${name} : js.jsify(${name})";
-    } else if (type.name.name == 'Map') {
+    } else if (_isTypedWith(type.type.element, 'dart.core', 'Map')) {
       return "${name} == null ? null : ${name} is js.Serializable ? ${name} : js.jsify(${name})";
-    } else if (type.name.name == 'DateTime') {
+    } else if (_isTypedWith(type.type.element, 'dart.core', 'DateTime')) {
       return "${name} == null ? null : ${name} is js.Serializable ? ${name} : new jsw.JsDateToDateTimeAdapter(${name})";
     }
   }
   return name;
 }
 
-String _handleReturn(String content, TypeName returnType, bool isEnum) {
+String _handleReturn(String content, TypeName returnType) {
   var wrap;
-  if (isEnum) {
-    wrap = (String s) => ' => ${returnType.name.name}.find(${s});';
-  } else if (returnType == null || _isTransferableType(returnType)) {
+  if (returnType == null || _isTransferableType(returnType)) {
     wrap = (String s) => ' => $s;';
-  } else if (returnType.name.name == 'void') {
+  } else if (_isVoid(returnType)) {
     wrap = (String s) => ' { $s; }';
-  } else if (returnType.name.name == 'List') {
+  } else if (_isTypedWith(returnType.type.element, 'dart.core', 'List')) {
     if (returnType.typeArguments == null || _isTransferableType(returnType.typeArguments.arguments.first)) {
       wrap = (String s) => ' => jsw.TypedJsArray.cast($s);';
     } else {
       wrap = (String s) => ' => jsw.TypedJsArray.castListOfSerializables($s, ${returnType.typeArguments.arguments.first}.cast);';
     }
-  } else if (returnType.name.name == 'DateTime') {
+  } else if (_isTypedWith(returnType.type.element, 'dart.core', 'DateTime')) {
     wrap = (String s) => ' => jsw.JsDateToDateTimeAdapter.cast($s);';
-  } else {
+  } else if (_isAssignableWith(returnType.type.element, 'js_wrapping', 'IsEnum')) {
+    wrap = (String s) => ' => ${returnType}.find($s);';
+  } else if (_isAssignableWith(returnType.type.element, 'js_wrapping', 'TypedJsObject')) {
     wrap = (String s) => ' => ${returnType}.cast($s);';
+  } else {
+    wrap = (String s) => ' => $s;';
   }
   return wrap(content);
 }
 
 bool _isTransferableType(TypeName typeName){
-  switch (typeName.name.name) {
-    case 'Object':
-    case 'bool':
-    case 'String':
-    case 'num':
-    case 'int':
-    case 'double':
-    case 'dynamic':
-    case 'js.JsObject':
-      return true;
+  if (_isVoid(typeName)) {
+    return false;
   }
-  return false;
+  return ['Object', 'bool', 'String', 'num', 'int', 'double', 'dynamic'].any((name) => _isTypedWith(typeName.type.element, 'dart.core', name))
+      || _isTypedWith(typeName.type.element, 'js_wrapping', 'JsObject');
 }
+
+bool _isVoid(TypeName typeName) => typeName.type.name == 'void';
+
+bool _isAssignableWith(ClassElement element, String libraryName, String className) =>
+    _isTypedWith(element, libraryName, className) ||
+    element.allSupertypes.any((i) => _isTypedWith(i.element, libraryName, className));
+
+bool _isTypedWith(Element element, String libraryName, String className) =>
+    element.library.name == libraryName && element.name == className;
 
 void _removeMetadata(List<_Transformation> transformations, AnnotatedNode n, bool testMetadata(Annotation a)) {
   n.metadata.where(testMetadata).forEach((a){
@@ -278,7 +309,12 @@ void _removeToken(List<_Transformation> transformations, Token t) {
   transformations.add(new _Transformation(t.offset, t.next.offset, ''));
 }
 
-bool _hasAnnotation(AnnotatedNode node, String name) => node.metadata.any((m) => m.name.name == name && m.constructorName == null && m.arguments == null);
+// TODO(aa) replace with element version when supported by AST
+bool _hasAnnotation(Declaration node, String name) => node.metadata.any((m) => m.name.name == name && m.constructorName == null && m.arguments == null);
+//bool _hasAnnotation(Declaration declaration, String name) =>
+//    declaration.element.metadata.any((m) =>
+//        m.element.library.name == _LIBRARY_NAME &&
+//        m.element.name == name);
 
 String _applyTransformations(String code, List<_Transformation> transformations) {
   int padding = 0;

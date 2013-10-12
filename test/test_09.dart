@@ -22,5 +22,5 @@ class Enum extends jsw.IsEnum<int> {
   List<String> f7;
   List f8;
   @namesWithUnderscores String f9Rox;
-  @isEnum Enum f10;
+  Enum f10;
 }

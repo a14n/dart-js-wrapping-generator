@@ -24,7 +24,7 @@ class Enum extends jsw.IsEnum<int> {
   List<String> get g4;
   List get g5;
   DateTime get g6;
-  @isEnum Enum get g7;
+  Enum get g7;
   String m1();
   void m2();
   m3();
@@ -32,5 +32,5 @@ class Enum extends jsw.IsEnum<int> {
   List<Person> m5();
   void m6(List l);
   void m7([List l]);
-  @isEnum Enum m8();
+  Enum m8();
 }
