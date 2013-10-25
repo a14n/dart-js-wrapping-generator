@@ -31,8 +31,6 @@ const _LIBRARY_NAME = 'js_wrapping.dart_generator';
 
 // TODO add @withInstanceOf
 // TODO add @remove to avoid super.method() - see MVCArray
-// TODO handle IsEnum.find
-// TODO don't use cast for type != TypedJsObject
 
 const wrapper = const _Wrapper();
 class _Wrapper {
@@ -245,47 +243,42 @@ String _handleFormalParameter(FormalParameter fp) => _handleParameter(fp.identif
 
 String _handleParameter(String name, TypeName type) {
   if (type != null) {
-    if (_isTypedWith(type.type.element, 'dart.core', 'List')) {
-      return "${name} == null ? null : ${name} is js.Serializable ? ${name} : js.jsify(${name})";
-    } else if (_isTypedWith(type.type.element, 'dart.core', 'Map')) {
-      return "${name} == null ? null : ${name} is js.Serializable ? ${name} : js.jsify(${name})";
-    } else if (_isTypedWith(type.type.element, 'dart.core', 'DateTime')) {
-      return "${name} == null ? null : ${name} is js.Serializable ? ${name} : new jsw.JsDateToDateTimeAdapter(${name})";
+    if (_isAssignableWith(type.type.element, 'dart.core', 'List') ||
+        _isAssignableWith(type.type.element, 'dart.core', 'Map')) {
+      return "${name} == null ? null : ${name} is jsw.TypedJsObject ? (${name} as jsw.TypedJsObject).${r'$unsafe'} : new js.JsObject.jsify(${name})";
+    } else if (_isAssignableWith(type.type.element, 'js_wrapping', 'TypedJsObject')) {
+      return "${name} == null ? null : ${name}.${r'$unsafe'}";
+    } else if (_isAssignableWith(type.type.element, 'js_wrapping', 'IsEnum')) {
+      return "${name} == null ? null : ${name}.value";
     }
   }
   return name;
 }
 
 String _handleReturn(String content, TypeName returnType) {
-  var wrap;
-  if (returnType == null || _isTransferableType(returnType)) {
-    wrap = (String s) => ' => $s;';
-  } else if (_isVoid(returnType)) {
-    wrap = (String s) => ' { $s; }';
-  } else if (_isTypedWith(returnType.type.element, 'dart.core', 'List')) {
-    if (returnType.typeArguments == null || _isTransferableType(returnType.typeArguments.arguments.first)) {
-      wrap = (String s) => ' => jsw.TypedJsArray.cast($s);';
-    } else {
-      wrap = (String s) => ' => jsw.TypedJsArray.castListOfSerializables($s, ${returnType.typeArguments.arguments.first}.cast);';
+  var wrap = (String s) => ' => $s;';
+  if (returnType != null) {
+    if (_isVoid(returnType)) {
+      wrap = (String s) => ' { $s; }';
+    } else if (returnType.type.element != null) {
+      if (_isTypedWith(returnType.type.element, 'dart.core', 'List')) {
+        if (returnType.typeArguments != null && _isAssignableWith(returnType.typeArguments.arguments.first.type.element, 'js_wrapping', 'TypedJsObject')) {
+          final genericType = returnType.typeArguments.arguments.first;
+          wrap = (String s) => ' => jsw.TypedJsArray.cast($s, new jsw.TranslatorForTypedJsObject<$genericType>($genericType.cast));';
+        } else if (returnType.typeArguments != null && _isAssignableWith(returnType.typeArguments.arguments.first.type.element, 'js_wrapping', 'TypedJsObject')) {
+          final genericType = returnType.typeArguments.arguments.first;
+          wrap = (String s) => ' => jsw.TypedJsArray.cast($s, new jsw.TranslatorForIsEnum<$genericType>($genericType.find));';
+        } else {
+          wrap = (String s) => ' => jsw.TypedJsArray.cast($s);';
+        }
+      } else if (_isAssignableWith(returnType.type.element, 'js_wrapping', 'IsEnum')) {
+        wrap = (String s) => ' => ${returnType}.find($s);';
+      } else if (_isAssignableWith(returnType.type.element, 'js_wrapping', 'TypedJsObject')) {
+        wrap = (String s) => ' => ${returnType}.cast($s);';
+      }
     }
-  } else if (_isTypedWith(returnType.type.element, 'dart.core', 'DateTime')) {
-    wrap = (String s) => ' => jsw.JsDateToDateTimeAdapter.cast($s);';
-  } else if (_isAssignableWith(returnType.type.element, 'js_wrapping', 'IsEnum')) {
-    wrap = (String s) => ' => ${returnType}.find($s);';
-  } else if (_isAssignableWith(returnType.type.element, 'js_wrapping', 'TypedJsObject')) {
-    wrap = (String s) => ' => ${returnType}.cast($s);';
-  } else {
-    wrap = (String s) => ' => $s;';
   }
   return wrap(content);
-}
-
-bool _isTransferableType(TypeName typeName){
-  if (_isVoid(typeName)) {
-    return false;
-  }
-  return ['Object', 'bool', 'String', 'num', 'int', 'double', 'dynamic'].any((name) => _isTypedWith(typeName.type.element, 'dart.core', name))
-      || _isTypedWith(typeName.type.element, 'js_wrapping', 'JsObject');
 }
 
 bool _isVoid(TypeName typeName) => typeName.type.name == 'void';

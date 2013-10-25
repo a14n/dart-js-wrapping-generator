@@ -20,18 +20,18 @@ class Person extends jsw.TypedJsObject {
       : super.fromJsObject(jsObject);
   set s1(String value) => $unsafe['s1'] = value;
   void set s2(Person value) {
-    $unsafe['s2'] = value;
+    $unsafe['s2'] = value == null ? null : value.$unsafe;
   }
   void set s3(DateTime value) {
-    $unsafe['s3'] = value == null ? null : value is js.Serializable ? value : new jsw.JsDateToDateTimeAdapter(value);
+    $unsafe['s3'] = value;
   }
-  set s4(Enum value) => $unsafe['s4'] = value;
+  set s4(Enum value) => $unsafe['s4'] = value == null ? null : value.value;
   String get g1 => $unsafe['g1'];
   Person get g2 => Person.cast($unsafe['g2']);
-  List<Person> get g3 => jsw.TypedJsArray.castListOfSerializables($unsafe['g3'], Person.cast);
+  List<Person> get g3 => jsw.TypedJsArray.cast($unsafe['g3'], new jsw.TranslatorForTypedJsObject<Person>(Person.cast));
   List<String> get g4 => jsw.TypedJsArray.cast($unsafe['g4']);
   List get g5 => jsw.TypedJsArray.cast($unsafe['g5']);
-  DateTime get g6 => jsw.JsDateToDateTimeAdapter.cast($unsafe['g6']);
+  DateTime get g6 => $unsafe['g6'];
   Enum get g7 => Enum.find($unsafe['g7']);
   String m1() => $unsafe.callMethod('m1');
   void m2() {
@@ -39,12 +39,12 @@ class Person extends jsw.TypedJsObject {
   }
   m3() => $unsafe.callMethod('m3');
   Person m4() => Person.cast($unsafe.callMethod('m4'));
-  List<Person> m5() => jsw.TypedJsArray.castListOfSerializables($unsafe.callMethod('m5'), Person.cast);
+  List<Person> m5() => jsw.TypedJsArray.cast($unsafe.callMethod('m5'), new jsw.TranslatorForTypedJsObject<Person>(Person.cast));
   void m6(List l) {
-    $unsafe.callMethod('m6', [l == null ? null : l is js.Serializable ? l : js.jsify(l)]);
+    $unsafe.callMethod('m6', [l == null ? null : l is jsw.TypedJsObject ? (l as jsw.TypedJsObject).$unsafe : new js.JsObject.jsify(l)]);
   }
   void m7([List l]) {
-    $unsafe.callMethod('m7', [l == null ? null : l is js.Serializable ? l : js.jsify(l)]);
+    $unsafe.callMethod('m7', [l == null ? null : l is jsw.TypedJsObject ? (l as jsw.TypedJsObject).$unsafe : new js.JsObject.jsify(l)]);
   }
   Enum m8() => Enum.find($unsafe.callMethod('m8'));
 }
