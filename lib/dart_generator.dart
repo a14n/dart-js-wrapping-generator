@@ -67,36 +67,37 @@ class _Generate {
 }
 
 class Generator {
-  String _libraryFile;
   final _context = AnalysisEngine.instance.createAnalysisContext();
 
-  Generator(String packagesDir, this._libraryFile) {
+  Generator(String packagesDir) {
     _context
       ..analysisOptions.hint = false
       ..analysisOptions.strictMode = false
       ..sourceFactory = new SourceFactory.con2([
           new DartUriResolver(DirectoryBasedDartSdk.defaultSdk),
           new FileUriResolver(),
-          new PackageUriResolver(new Directory(packagesDir).listSync().map((e) => new JavaFile(e.path)).toList())]
+          new PackageUriResolver([new JavaFile(p.absolute('packages'))])]
       );
   }
 
-  void transformDirectory(Directory from, Directory to) {
+  void transformLibrary(File libraryFile) {}
+
+  void _transformDirectory(Directory from, Directory to) {
     from.listSync().forEach((FileSystemEntity fse){
       final name = p.basename(fse.path);
       final destination = p.join(to.path, name);
       if (fse is File) {
-        transformFile(fse, new File(destination));
+        transformFile(null, fse, new File(destination));
       } else if (fse is Directory) {
         final d = new Directory(destination);
         if (d.existsSync()) d..deleteSync(recursive: true);
         d.createSync();
-        transformDirectory(fse, d);
+        _transformDirectory(fse, d);
       }
     });
   }
 
-  void transformFile(File from, File to) {
+  void transformFile(File libraryFile, File from, File to) {
     final name = p.basename(from.path);
 
     // reset destination
@@ -104,7 +105,7 @@ class Generator {
     to.createSync();
 
     // transform
-    final unit = parseDartFile(from.path);
+    final unit = parseDartFile(libraryFile, from);
     final code = from.readAsStringSync();
     final transformations = _buildTransformations(unit, code);
     final source = _applyTransformations(code, transformations);
@@ -116,10 +117,9 @@ class Generator {
   }
 
   /// Parses a Dart file into an AST.
-  CompilationUnit parseDartFile(String path) {
-    final absolutePath = p.absolute(path);
-    final librarySource = new FileBasedSource.con1(_context.sourceFactory.contentCache, new JavaFile(absolutePath));
-    final fileSource = new FileBasedSource.con1(_context.sourceFactory.contentCache, new JavaFile(absolutePath));
+  CompilationUnit parseDartFile(File libraryFile, File file) {
+    final librarySource = new FileBasedSource.con1(_context.sourceFactory.contentCache, new JavaFile(p.absolute(libraryFile.path)));
+    final fileSource = new FileBasedSource.con1(_context.sourceFactory.contentCache, new JavaFile(p.absolute(file.path)));
     final library = _context.computeLibraryElement(librarySource);
     return _context.resolveCompilationUnit(fileSource, library);
   }
@@ -309,12 +309,11 @@ void _removeToken(List<_Transformation> transformations, Token t) {
   transformations.add(new _Transformation(t.offset, t.next.offset, ''));
 }
 
-// TODO(aa) replace with element version when supported by AST
-bool _hasAnnotation(Declaration node, String name) => node.metadata.any((m) => m.name.name == name && m.constructorName == null && m.arguments == null);
-//bool _hasAnnotation(Declaration declaration, String name) =>
-//    declaration.element.metadata.any((m) =>
-//        m.element.library.name == _LIBRARY_NAME &&
-//        m.element.name == name);
+bool _hasAnnotation(Declaration declaration, String name) =>
+    declaration.metadata != null &&
+    declaration.metadata.any((m) =>
+        m.element.library.name == _LIBRARY_NAME &&
+        m.element.name == name);
 
 String _applyTransformations(String code, List<_Transformation> transformations) {
   int padding = 0;

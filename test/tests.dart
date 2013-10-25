@@ -20,13 +20,15 @@ main() {
   test('@generate', () => _runTest('11'));
 }
 
+Generator _generator = new Generator('packages');
+
 _runTest(String name) {
   final result = new File("test_${name}_result.dart");
   try {
     if (result.existsSync()) result.deleteSync();
     result.createSync();
     final fileName = "test_${name}.dart";
-    new Generator('packages', fileName).transformFile(new File(fileName), result);
+    _generator.transformFile(new File(fileName), new File(fileName), result);
     expect(result.readAsStringSync(), new File("test_${name}_expect.dart").readAsStringSync());
   } finally {
     if (result.existsSync()) result.deleteSync();
