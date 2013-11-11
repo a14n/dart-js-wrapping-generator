@@ -1,36 +1,25 @@
 import 'dart:io';
 
 import 'package:js_wrapping_generator/dart_generator.dart';
+import 'package:path/path.dart' as p;
 import 'package:unittest/unittest.dart';
-
-main() {
-  group('@wrapper', () {
-    test('with simple class', () => _runTest('01'));
-    test('with simple abstract class', () => _runTest('02'));
-    test('with simple abstract class with @keepAbstract', () => _runTest('03'));
-    test('with class already extending', () => _runTest('04'));
-    test('with class with already undefined cast', () => _runTest('05'));
-    test('with class with already custom cast', () => _runTest('06'));
-    test('with class with already custom constructor', () => _runTest('07'));
-  });
-
-  test('methods', () => _runTest('08'));
-  test('fields', () => _runTest('09'));
-  test('@forMethods on class', () => _runTest('10'));
-  test('@generate', () => _runTest('11'));
-}
 
 Generator _generator = new Generator('packages');
 
-_runTest(String name) {
-  final result = new File("test_${name}_result.dart");
-  try {
-    if (result.existsSync()) result.deleteSync();
-    result.createSync();
-    final fileName = "test_${name}.dart";
-    _generator.transformFile(new File(fileName), new File(fileName), result);
-    expect(result.readAsStringSync(), new File("test_${name}_expect.dart").readAsStringSync());
-  } finally {
-    if (result.existsSync()) result.deleteSync();
-  }
+main() {
+  new Directory('templates').listSync()
+    ..sort((f1,f2) => f1.path.compareTo(f2.path))
+    ..where((e) => FileSystemEntity.isFileSync(e.path)).forEach((f){
+      test(f.path, () {
+        final fileName = p.basename(f.path);
+        final genDir = new Directory('generated-files')..createSync();
+        try {
+          _generator.transformFile(f, f, genDir);
+          expect(new File(p.join(genDir.path, fileName)).readAsStringSync(),
+              equals(new File(p.join('expected-files', fileName)).readAsStringSync()));
+        } finally {
+          if (genDir.existsSync()) genDir.deleteSync(recursive: true);
+        }
+      });
+    });
 }

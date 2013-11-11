@@ -18,6 +18,7 @@ class Enum extends jsw.IsEnum<int> {
   void set s2(Person value);
   void set s3(DateTime value);
   set s4(Enum value);
+  void set s5(dynamic value);
   String get g1;
   Person get g2;
   List<Person> get g3;

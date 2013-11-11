@@ -3,10 +3,12 @@ version: 0.0.2-dev
 author: Alexandre Ardhuin <alexandre.ardhuin@gmail.com>
 description: That package allows to generate wrappers for JS library in Dart.
 homepage: https://github.com/a14n/dart-js-wrapping-generator
+environment:
+  sdk: '>=0.8.10+6 <2.0.0'
 dependencies:
-  analyzer_experimental: any
-  js_wrapping: any
-  meta: any
-  path: any
+  analyzer: '>=0.10.1 <0.11.0'
+  js_wrapping:
+    path: ../dart-js-wrapping
+  path: '>=0.9.0 <0.10.0'
 dev_dependencies:
-  unittest: any
+  unittest: '>=0.9.0 <0.10.0'

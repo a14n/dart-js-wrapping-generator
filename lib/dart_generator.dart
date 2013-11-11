@@ -16,19 +16,21 @@ library js_wrapping.dart_generator;
 
 import 'dart:io';
 
-import 'package:analyzer_experimental/analyzer.dart';
-import 'package:analyzer_experimental/src/generated/element.dart';
-import 'package:analyzer_experimental/src/generated/engine.dart';
-import 'package:analyzer_experimental/src/generated/java_io.dart';
-import 'package:analyzer_experimental/src/generated/scanner.dart';
-import 'package:analyzer_experimental/src/generated/sdk_io.dart';
-import 'package:analyzer_experimental/src/generated/source_io.dart';
-import 'package:analyzer_experimental/src/services/formatter_impl.dart';
+import 'package:analyzer/analyzer.dart';
+import 'package:analyzer/src/generated/element.dart';
+import 'package:analyzer/src/generated/engine.dart';
+import 'package:analyzer/src/generated/java_io.dart';
+import 'package:analyzer/src/generated/scanner.dart';
+import 'package:analyzer/src/generated/sdk_io.dart';
+import 'package:analyzer/src/generated/source_io.dart';
+import 'package:analyzer/src/services/formatter_impl.dart';
 
 import 'package:path/path.dart' as p;
 
 const _LIBRARY_NAME = 'js_wrapping.dart_generator';
 
+// TODO handle dynamic/*String|Type*/ see MapTypeControlOptions.mapTypeIds
+// TODO handle constructors
 // TODO add @withInstanceOf
 // TODO add @remove to avoid super.method() - see MVCArray
 
@@ -78,29 +80,29 @@ class Generator {
       );
   }
 
-  void transformLibrary(File libraryFile) {}
+  void transformLibrary(File libraryFile, Directory to) {}
 
-  void _transformDirectory(Directory from, Directory to) {
+  void transformDirectory(File libraryFile, Directory from, Directory to) {
     from.listSync().forEach((FileSystemEntity fse){
       final name = p.basename(fse.path);
-      final destination = p.join(to.path, name);
       if (fse is File) {
-        transformFile(null, fse, new File(destination));
+        transformFile(libraryFile, fse, to);
       } else if (fse is Directory) {
-        final d = new Directory(destination);
+        final d = new Directory(p.join(to.path, name));
         if (d.existsSync()) d..deleteSync(recursive: true);
-        d.createSync();
-        _transformDirectory(fse, d);
+        d.createSync(recursive: true);
+        transformDirectory(libraryFile, fse, d);
       }
     });
   }
 
-  void transformFile(File libraryFile, File from, File to) {
+  void transformFile(File libraryFile, File from, Directory to) {
     final name = p.basename(from.path);
+    final generatedFile = new File(p.join(to.path, name));
 
-    // reset destination
-    if (to.existsSync()) to..deleteSync();
-    to.createSync();
+    // reset generatedFile
+    if (generatedFile.existsSync()) generatedFile..deleteSync();
+    generatedFile.createSync(recursive: true);
 
     // transform
     final unit = parseDartFile(libraryFile, from);
@@ -108,9 +110,9 @@ class Generator {
     final transformations = _buildTransformations(unit, code);
     final source = _applyTransformations(code, transformations);
     try {
-      to.writeAsStringSync(new CodeFormatter().format(CodeKind.COMPILATION_UNIT, source).source);
+      generatedFile.writeAsStringSync(new CodeFormatter().format(CodeKind.COMPILATION_UNIT, source).source);
     } on FormatterException {
-      to.writeAsStringSync(source);
+      generatedFile.writeAsStringSync(source);
     }
   }
 
@@ -239,7 +241,7 @@ void _writeGetter(StringBuffer content, String name, TypeName returnType, {_Prop
   }
 }
 
-String _handleFormalParameter(FormalParameter fp) => _handleParameter(fp.identifier.name, fp is SimpleFormalParameter ? (fp as SimpleFormalParameter).type : fp is DefaultFormalParameter && (fp as DefaultFormalParameter).parameter is SimpleFormalParameter ? ((fp as DefaultFormalParameter).parameter as SimpleFormalParameter).type : null);
+String _handleFormalParameter(FormalParameter fp) => _handleParameter(fp.identifier.name, fp is SimpleFormalParameter ? fp.type : fp is DefaultFormalParameter && fp.parameter is SimpleFormalParameter ? (fp.parameter as SimpleFormalParameter).type : null);
 
 String _handleParameter(String name, TypeName type) {
   if (type != null) {
@@ -283,12 +285,12 @@ String _handleReturn(String content, TypeName returnType) {
 
 bool _isVoid(TypeName typeName) => typeName.type.name == 'void';
 
-bool _isAssignableWith(ClassElement element, String libraryName, String className) =>
+bool _isAssignableWith(Element element, String libraryName, String className) =>
     _isTypedWith(element, libraryName, className) ||
-    element.allSupertypes.any((i) => _isTypedWith(i.element, libraryName, className));
+    (element is ClassElement && element.allSupertypes.any((i) => _isTypedWith(i.element, libraryName, className)));
 
 bool _isTypedWith(Element element, String libraryName, String className) =>
-    element.library.name == libraryName && element.name == className;
+    element is ClassElement && element.library.name == libraryName && element.name == className;
 
 void _removeMetadata(List<_Transformation> transformations, AnnotatedNode n, bool testMetadata(Annotation a)) {
   n.metadata.where(testMetadata).forEach((a){

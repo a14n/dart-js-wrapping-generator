@@ -26,6 +26,9 @@ class Person extends jsw.TypedJsObject {
     $unsafe['s3'] = value;
   }
   set s4(Enum value) => $unsafe['s4'] = value == null ? null : value.value;
+  void set s5(dynamic value) {
+    $unsafe['s5'] = value;
+  }
   String get g1 => $unsafe['g1'];
   Person get g2 => Person.cast($unsafe['g2']);
   List<Person> get g3 => jsw.TypedJsArray.cast($unsafe['g3'], new jsw.TranslatorForTypedJsObject<Person>(Person.cast));
