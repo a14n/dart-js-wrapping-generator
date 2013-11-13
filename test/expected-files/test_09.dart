@@ -28,11 +28,11 @@ class Person extends jsw.TypedJsObject {
   String get f4 => $unsafe['f4'];
   set f5(Person f5) => $unsafe['f5'] = f5 == null ? null : f5.$unsafe;
   Person get f5 => Person.cast($unsafe['f5']);
-  set f6(List<Person> f6) => $unsafe['f6'] = f6 == null ? null : f6 is jsw.TypedJsObject ? (f6 as jsw.TypedJsObject).$unsafe : new js.JsObject.jsify(f6);
+  set f6(List<Person> f6) => $unsafe['f6'] = f6 == null ? null : (f6 is jsw.TypedJsObject ? (f6 as jsw.TypedJsObject).$unsafe : new js.JsObject.jsify(f6));
   List<Person> get f6 => jsw.TypedJsArray.cast($unsafe['f6'], new jsw.TranslatorForTypedJsObject<Person>(Person.cast));
-  set f7(List<String> f7) => $unsafe['f7'] = f7 == null ? null : f7 is jsw.TypedJsObject ? (f7 as jsw.TypedJsObject).$unsafe : new js.JsObject.jsify(f7);
+  set f7(List<String> f7) => $unsafe['f7'] = f7 == null ? null : (f7 is jsw.TypedJsObject ? (f7 as jsw.TypedJsObject).$unsafe : new js.JsObject.jsify(f7));
   List<String> get f7 => jsw.TypedJsArray.cast($unsafe['f7']);
-  set f8(List f8) => $unsafe['f8'] = f8 == null ? null : f8 is jsw.TypedJsObject ? (f8 as jsw.TypedJsObject).$unsafe : new js.JsObject.jsify(f8);
+  set f8(List f8) => $unsafe['f8'] = f8 == null ? null : (f8 is jsw.TypedJsObject ? (f8 as jsw.TypedJsObject).$unsafe : new js.JsObject.jsify(f8));
   List get f8 => jsw.TypedJsArray.cast($unsafe['f8']);
   set f9Rox(String f9Rox) => $unsafe['f9_rox'] = f9Rox;
   String get f9Rox => $unsafe['f9_rox'];

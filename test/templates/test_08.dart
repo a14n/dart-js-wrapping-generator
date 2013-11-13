@@ -19,6 +19,7 @@ class Enum extends jsw.IsEnum<int> {
   void set s3(DateTime value);
   set s4(Enum value);
   void set s5(dynamic value);
+  void set s6(@Types(const [Person, num]) dynamic value);
   String get g1;
   Person get g2;
   List<Person> get g3;
@@ -26,6 +27,7 @@ class Enum extends jsw.IsEnum<int> {
   List get g5;
   DateTime get g6;
   Enum get g7;
+  @Types(const [Person, num]) dynamic get g8;
   String m1();
   void m2();
   m3();
@@ -34,4 +36,5 @@ class Enum extends jsw.IsEnum<int> {
   void m6(List l);
   void m7([List l]);
   Enum m8();
+  void m9(@Types(const [Person, num]) dynamic value);
 }

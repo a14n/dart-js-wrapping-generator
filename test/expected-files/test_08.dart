@@ -29,6 +29,9 @@ class Person extends jsw.TypedJsObject {
   void set s5(dynamic value) {
     $unsafe['s5'] = value;
   }
+  void set s6(dynamic value) {
+    $unsafe['s6'] = value == null ? null : value is Person ? value.$unsafe : value is num ? value : throw "bad type";
+  }
   String get g1 => $unsafe['g1'];
   Person get g2 => Person.cast($unsafe['g2']);
   List<Person> get g3 => jsw.TypedJsArray.cast($unsafe['g3'], new jsw.TranslatorForTypedJsObject<Person>(Person.cast));
@@ -36,6 +39,7 @@ class Person extends jsw.TypedJsObject {
   List get g5 => jsw.TypedJsArray.cast($unsafe['g5']);
   DateTime get g6 => $unsafe['g6'];
   Enum get g7 => Enum.find($unsafe['g7']);
+  dynamic get g8 => $unsafe['g8'];
   String m1() => $unsafe.callMethod('m1');
   void m2() {
     $unsafe.callMethod('m2');
@@ -44,10 +48,13 @@ class Person extends jsw.TypedJsObject {
   Person m4() => Person.cast($unsafe.callMethod('m4'));
   List<Person> m5() => jsw.TypedJsArray.cast($unsafe.callMethod('m5'), new jsw.TranslatorForTypedJsObject<Person>(Person.cast));
   void m6(List l) {
-    $unsafe.callMethod('m6', [l == null ? null : l is jsw.TypedJsObject ? (l as jsw.TypedJsObject).$unsafe : new js.JsObject.jsify(l)]);
+    $unsafe.callMethod('m6', [l == null ? null : (l is jsw.TypedJsObject ? (l as jsw.TypedJsObject).$unsafe : new js.JsObject.jsify(l))]);
   }
   void m7([List l]) {
-    $unsafe.callMethod('m7', [l == null ? null : l is jsw.TypedJsObject ? (l as jsw.TypedJsObject).$unsafe : new js.JsObject.jsify(l)]);
+    $unsafe.callMethod('m7', [l == null ? null : (l is jsw.TypedJsObject ? (l as jsw.TypedJsObject).$unsafe : new js.JsObject.jsify(l))]);
   }
   Enum m8() => Enum.find($unsafe.callMethod('m8'));
+  void m9(dynamic value) {
+    $unsafe.callMethod('m9', [value == null ? null : value is Person ? value.$unsafe : value is num ? value : throw "bad type"]);
+  }
 }

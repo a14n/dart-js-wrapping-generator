@@ -29,7 +29,7 @@ import 'package:path/path.dart' as p;
 
 const _LIBRARY_NAME = 'js_wrapping.dart_generator';
 
-// TODO handle dynamic/*String|Type*/ see MapTypeControlOptions.mapTypeIds
+// TODO handle dynamic/*String|Type*/ on returned value see MapTypeControlOptions.mapTypeIds
 // TODO add @withInstanceOf
 // TODO add @remove to avoid super.method() - see MVCArray
 
@@ -63,6 +63,11 @@ class _PropertyMapping {
 const generate = const _Generate();
 class _Generate {
   const _Generate();
+}
+
+class Types {
+  final List<Type> types;
+  const Types(this.types);
 }
 
 class Generator {
@@ -191,12 +196,13 @@ class Generator {
           } else if (m is FieldDeclaration) {
             final content = new StringBuffer();
             final type = m.fields.type;
-            for (final v in m.fields.variables) {
+            final metadatas = m.metadata;
+            for (final VariableDeclaration v in m.fields.variables) {
               final name = v.name.name;
               if (name.startsWith('_')) {
                 return; // skip fieldDeclaration
               } else {
-                _writeSetter(content, name, null, type, access: access);
+                _writeSetterForField(content, name, type, metadatas, access: access);
                 content.write('\n');
                 _writeGetter(content, name, type, access: access);
                 content.write('\n');
@@ -210,8 +216,7 @@ class Generator {
           } else if (m is MethodDeclaration && (m.isAbstract || generate) && !m.isStatic && !m.isOperator && !_hasAnnotation(m, 'keepAbstract')) {
             final method = new StringBuffer();
             if (m.isSetter){
-              final SimpleFormalParameter param = m.parameters.parameters.first;
-              _writeSetter(method, m.name.name, m.returnType, param.type, access: access, paramName: param.identifier.name);
+              _writeSetterForSetter(method, m, access: access);
             } else if (m.isGetter) {
               _writeGetter(method, m.name.name, m.returnType, access: access);
             } else {
@@ -230,17 +235,33 @@ class Generator {
   }
 }
 
-void _writeSetter(StringBuffer sb, String name, TypeName returnType, TypeName paramType, {_PropertyMapping access, paramName: null}) {
-  paramName = paramName != null ? paramName : name;
+void _writeSetterForSetter(StringBuffer sb, MethodDeclaration setter, {_PropertyMapping access}) {
+  final FormalParameter param = setter.parameters.parameters.first;
+  final NodeList<Annotation> metadatas = param is SimpleFormalParameter ? param.metadata : null;
+  final Type2 paramType = param.element != null && param.element.type != null ? param.element.type : null;
+  final String paramTypeAsString = param is SimpleFormalParameter ? param.type.name.name : '';
+  final String paramName = param.identifier.name;
+  _writeSetter(sb, setter.name.name, setter.returnType, paramTypeAsString, paramName, _handleParameter(paramName, paramType, metadatas), access: access);
+}
+
+void _writeSetterForField(StringBuffer sb, String name, TypeName type, NodeList<Annotation> metadatas, {_PropertyMapping access}) {
+  final Type2 paramType = type != null && type.type != null ? type.type : null;
+  final String paramTypeAsString = type.toString();
+  final String paramName = name;
+  _writeSetter(sb, name, null, paramTypeAsString, paramName, _handleParameter(paramName, paramType, metadatas), access: access);
+}
+
+void _writeSetter(StringBuffer sb, String name, TypeName returnType, String paramType, String paramName, String value, {_PropertyMapping access}) {
   if (returnType != null) sb.write("${returnType} ");
+  sb.write('set ${name}(${paramType} ${paramName})');
   if (access == forMethods) {
     final nameCapitalized = _capitalize(name);
-    sb.write("set ${name}(${paramType} ${paramName})${_handleReturn("\$unsafe.callMethod('set${nameCapitalized}', [${_handleParameter(paramName, paramType)}])", returnType)}");
+    sb.write(_handleReturn("\$unsafe.callMethod('set${nameCapitalized}', [${value}])", returnType));
   } else if (access == namesWithUnderscores) {
     final nameWithUnderscores = _withUnderscores(name);
-    sb.write("set ${name}(${paramType} ${paramName})${_handleReturn("\$unsafe['${nameWithUnderscores}'] = ${_handleParameter(paramName, paramType)}", returnType)}");
+    sb.write(_handleReturn("\$unsafe['${nameWithUnderscores}'] = ${value}", returnType));
   } else {
-    sb.write("set ${name}(${paramType} ${paramName})${_handleReturn("\$unsafe['${name}'] = ${_handleParameter(paramName, paramType)}", returnType)}");
+    sb.write(_handleReturn("\$unsafe['${name}'] = ${value}", returnType));
   }
 }
 
@@ -256,20 +277,66 @@ void _writeGetter(StringBuffer content, String name, TypeName returnType, {_Prop
   }
 }
 
-String _handleFormalParameter(FormalParameter fp) => _handleParameter(fp.identifier.name, fp is SimpleFormalParameter ? fp.type : fp is DefaultFormalParameter && fp.parameter is SimpleFormalParameter ? (fp.parameter as SimpleFormalParameter).type : null);
+//String _handleFormalParameter(FormalParameter fp) => _handleParameter(fp.identifier.name, fp is SimpleFormalParameter ? fp.type : fp is DefaultFormalParameter && fp.parameter is SimpleFormalParameter ? (fp.parameter as SimpleFormalParameter).type : null);
 
-String _handleParameter(String name, TypeName type) {
+String _handleFormalParameter(FormalParameter fp) {
+  final Type2 paramType = fp.element != null && fp.element.type != null ? fp.element.type : null;
+  final NodeList<Annotation> annotations = fp is NormalFormalParameter ? fp.metadata : null;
+  return _handleParameter(fp.identifier.name, paramType, annotations);
+}
+
+String _handleParameter(String name, Type2 type, NodeList<Annotation> metadatas) {
   if (type != null) {
-    if (_isAssignableWith(type.type.element, 'dart.core', 'List') ||
-        _isAssignableWith(type.type.element, 'dart.core', 'Map')) {
-      return "${name} == null ? null : ${name} is jsw.TypedJsObject ? (${name} as jsw.TypedJsObject).${r'$unsafe'} : new js.JsObject.jsify(${name})";
-    } else if (_isAssignableWith(type.type.element, 'js_wrapping', 'TypedJsObject')) {
-      return "${name} == null ? null : ${name}.${r'$unsafe'}";
-    } else if (_isAssignableWith(type.type.element, 'js_wrapping', 'IsEnum')) {
-      return "${name} == null ? null : ${name}.value";
+    final transformation = _mayTransformParameter(name, type, metadatas);
+    if (transformation != null) {
+      return "${name} == null ? null : ${transformation}";
     }
   }
   return name;
+}
+
+String _mayTransformParameter(String name, Type2 type, List<Annotation> metadatas) {
+  if (_isTypeAssignableWith(type, 'dart.core', 'List') ||
+      _isTypeAssignableWith(type, 'dart.core', 'Map')) {
+    return "(${name} is jsw.TypedJsObject ? (${name} as jsw.TypedJsObject).${r'$unsafe'} : new js.JsObject.jsify(${name}))";
+  }
+  if (_isTypeAssignableWith(type, 'js_wrapping', 'TypedJsObject')) {
+    return "${name}.${r'$unsafe'}";
+  }
+  if (_isTypeAssignableWith(type, 'js_wrapping', 'IsEnum')) {
+    return "${name}.value";
+  }
+  final filterTypesMetadata = (Annotation a) => _isElementTypedWith(a.element is ConstructorElement ? a.element.enclosingElement : a.element, _LIBRARY_NAME, 'Types');
+  if (metadatas.any(filterTypesMetadata)) {
+    final Annotation types = metadatas.firstWhere(filterTypesMetadata);
+    final ListLiteral listOfTypes = types.arguments.arguments.first;
+    return listOfTypes.elements.map((SimpleIdentifier e){
+      ClassElement classElement = _getClassElement(e.name, e.staticElement.library);
+      final value = _mayTransformParameter(name, classElement.type, []);
+      return '${name} is ${e.name} ? ' + (value != null ? value : name) + ' : ';
+    }).join() + ' throw "bad type"';
+  }
+  return null;
+}
+
+ClassElement _getClassElement(String name, LibraryElement library) {
+  final parts = name.split('.');
+  String classPrefix;
+  String className;
+  if (parts.length == 1) {
+    className = parts[0];
+  } else {
+    classPrefix = parts[0];
+    className = parts[1];
+  }
+  for (final import in library.imports) {
+    if (classPrefix == null && import.prefix != null) continue;
+    if (classPrefix != null && import.prefix == null) continue;
+    if (classPrefix != null && import.prefix.name != classPrefix) continue;
+    if (import.combinators.any((c) => c is HideElementCombinator && c.hiddenNames.contains(className))) continue;
+    if (import.combinators.any((c) => c is ShowElementCombinator && !c.shownNames.contains(className))) continue;
+    return import.library.getType(className);
+  }
 }
 
 String _handleReturn(String content, TypeName returnType) {
@@ -278,19 +345,19 @@ String _handleReturn(String content, TypeName returnType) {
     if (_isVoid(returnType)) {
       wrap = (String s) => ' { $s; }';
     } else if (returnType.type.element != null) {
-      if (_isTypedWith(returnType.type.element, 'dart.core', 'List')) {
-        if (returnType.typeArguments != null && _isAssignableWith(returnType.typeArguments.arguments.first.type.element, 'js_wrapping', 'TypedJsObject')) {
+      if (_isTypeTypedWith(returnType.type, 'dart.core', 'List')) {
+        if (returnType.typeArguments != null && _isTypeAssignableWith(returnType.typeArguments.arguments.first.type, 'js_wrapping', 'TypedJsObject')) {
           final genericType = returnType.typeArguments.arguments.first;
           wrap = (String s) => ' => jsw.TypedJsArray.cast($s, new jsw.TranslatorForTypedJsObject<$genericType>($genericType.cast));';
-        } else if (returnType.typeArguments != null && _isAssignableWith(returnType.typeArguments.arguments.first.type.element, 'js_wrapping', 'TypedJsObject')) {
+        } else if (returnType.typeArguments != null && _isTypeAssignableWith(returnType.typeArguments.arguments.first.type, 'js_wrapping', 'TypedJsObject')) {
           final genericType = returnType.typeArguments.arguments.first;
           wrap = (String s) => ' => jsw.TypedJsArray.cast($s, new jsw.TranslatorForIsEnum<$genericType>($genericType.find));';
         } else {
           wrap = (String s) => ' => jsw.TypedJsArray.cast($s);';
         }
-      } else if (_isAssignableWith(returnType.type.element, 'js_wrapping', 'IsEnum')) {
+      } else if (_isTypeAssignableWith(returnType.type, 'js_wrapping', 'IsEnum')) {
         wrap = (String s) => ' => ${returnType}.find($s);';
-      } else if (_isAssignableWith(returnType.type.element, 'js_wrapping', 'TypedJsObject')) {
+      } else if (_isTypeAssignableWith(returnType.type, 'js_wrapping', 'TypedJsObject')) {
         wrap = (String s) => ' => ${returnType}.cast($s);';
       }
     }
@@ -300,12 +367,18 @@ String _handleReturn(String content, TypeName returnType) {
 
 bool _isVoid(TypeName typeName) => typeName.type.name == 'void';
 
-bool _isAssignableWith(Element element, String libraryName, String className) =>
-    _isTypedWith(element, libraryName, className) ||
-    (element is ClassElement && element.allSupertypes.any((i) => _isTypedWith(i.element, libraryName, className)));
+bool _isTypeAssignableWith(Type2 type, String libraryName, String className) =>
+    type != null && _isElementAssignableWith(type.element, libraryName, className);
 
-bool _isTypedWith(Element element, String libraryName, String className) =>
-    element is ClassElement && element.library.name == libraryName && element.name == className;
+bool _isTypeTypedWith(Type2 type, String libraryName, String className) =>
+    type != null && _isElementTypedWith(type.element, libraryName, className);
+
+bool _isElementAssignableWith(Element element, String libraryName, String className) =>
+    _isElementTypedWith(element, libraryName, className) ||
+    (element is ClassElement && element.allSupertypes.any((supertype) => _isTypeTypedWith(supertype, libraryName, className)));
+
+bool _isElementTypedWith(Element element, String libraryName, String className) =>
+    element.library != null && element.library.name == libraryName && element.name == className;
 
 void _removeMetadata(List<_Transformation> transformations, AnnotatedNode n, bool testMetadata(Annotation a)) {
   n.metadata.where(testMetadata).forEach((a){
