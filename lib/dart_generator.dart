@@ -30,7 +30,6 @@ import 'package:path/path.dart' as p;
 const _LIBRARY_NAME = 'js_wrapping.dart_generator';
 
 // TODO handle dynamic/*String|Type*/ see MapTypeControlOptions.mapTypeIds
-// TODO handle constructors
 // TODO add @withInstanceOf
 // TODO add @remove to avoid super.method() - see MVCArray
 
@@ -68,6 +67,7 @@ class _Generate {
 
 class Generator {
   final _context = AnalysisEngine.instance.createAnalysisContext();
+  String dartConstructorNS;
 
   Generator(String packagesDir) {
     _context
@@ -124,95 +124,110 @@ class Generator {
     return _context.resolveCompilationUnit(fileSource, library);
   }
 
-}
+  List<_Transformation> _buildTransformations(CompilationUnit unit, String code) {
+    final result = new List<_Transformation>();
+    for (final declaration in unit.declarations) {
+      if (declaration is ClassDeclaration && _hasAnnotation(declaration, 'wrapper')) {
+        // remove @wrapper
+        _removeMetadata(result, declaration, (m) => m.name.name == 'wrapper');
 
-List<_Transformation> _buildTransformations(CompilationUnit unit, String code) {
-  final result = new List<_Transformation>();
-  for (final declaration in unit.declarations) {
-    if (declaration is ClassDeclaration && _hasAnnotation(declaration, 'wrapper')) {
-      // remove @wrapper
-      _removeMetadata(result, declaration, (m) => m.name.name == 'wrapper');
+        // @forMethods on class
+        final forMethodsOnClass = _hasAnnotation(declaration, 'forMethods');
+        _removeMetadata(result, declaration, (m) => m.name.name == 'forMethods');
 
-      // @forMethods on class
-      final forMethodsOnClass = _hasAnnotation(declaration, 'forMethods');
-      _removeMetadata(result, declaration, (m) => m.name.name == 'forMethods');
+        // @namesWithUnderscores on class
+        final namesWithUnderscoresOnClass = _hasAnnotation(declaration, 'namesWithUnderscores');
+        _removeMetadata(result, declaration, (m) => m.name.name == 'namesWithUnderscores');
 
-      // @namesWithUnderscores on class
-      final namesWithUnderscoresOnClass = _hasAnnotation(declaration, 'namesWithUnderscores');
-      _removeMetadata(result, declaration, (m) => m.name.name == 'namesWithUnderscores');
+        // @skipCast on class
+        final skipCast = _hasAnnotation(declaration, 'skipCast');
+        _removeMetadata(result, declaration, (m) => m.name.name == 'skipCast');
 
-      // @skipCast on class
-      final skipCast = _hasAnnotation(declaration, 'skipCast');
-      _removeMetadata(result, declaration, (m) => m.name.name == 'skipCast');
+        // @skipConstructor on class
+        final skipConstructor = _hasAnnotation(declaration, 'skipConstructor');
+        _removeMetadata(result, declaration, (m) => m.name.name == 'skipConstructor');
 
-      // @skipConstructor on class
-      final skipConstructor = _hasAnnotation(declaration, 'skipConstructor');
-      _removeMetadata(result, declaration, (m) => m.name.name == 'skipConstructor');
-
-      // remove @keepAbstract or abstract
-      final keepAbstract = _hasAnnotation(declaration, 'keepAbstract');
-      if (keepAbstract) {
-        _removeMetadata(result, declaration, (m) => m.name.name == 'keepAbstract');
-      } else if (declaration.abstractKeyword != null) {
-        final abstractKeyword = declaration.abstractKeyword;
-        _removeToken(result, abstractKeyword);
-      }
-
-      // add cast and constructor
-      final name = declaration.name;
-      final position = declaration.leftBracket.offset;
-      final alreadyExtends = declaration.extendsClause != null;
-      result.add(new _Transformation(position, position + 1,
-          (alreadyExtends ? '' : 'extends jsw.TypedJsObject ') + '{' +
-          (skipCast || keepAbstract ? '' : '\n  static $name cast(js.JsObject jsObject) => jsObject == null ? null : new $name.fromJsObject(jsObject);') +
-          (skipConstructor ? '' : '\n  $name.fromJsObject(js.JsObject jsObject) : super.fromJsObject(jsObject);')
-          ));
-
-      // generate member
-      declaration.members.forEach((m){
-        final access = forMethodsOnClass || _hasAnnotation(m, 'forMethods') ? forMethods :
-          namesWithUnderscoresOnClass || _hasAnnotation(m, 'namesWithUnderscores') ? namesWithUnderscores : null;
-        final generate = _hasAnnotation(m, 'generate');
-        _removeMetadata(result, declaration, (m) => m.name.name == 'generate');
-        if (m is FieldDeclaration) {
-          final content = new StringBuffer();
-          final type = m.fields.type;
-          for (final v in m.fields.variables) {
-            final name = v.name.name;
-            if (name.startsWith('_')) {
-              return; // skip fieldDeclaration
-            } else {
-              _writeSetter(content, name, null, type, access: access);
-              content.write('\n');
-              _writeGetter(content, name, type, access: access);
-              content.write('\n');
-            }
-          }
-          result.add(new _Transformation(m.offset, m.endToken.next.offset, content.toString()));
-        } else if (m is MethodDeclaration && m.name.name == 'cast') {
-          if (!skipCast) {
-            _removeNode(result, m);
-          }
-        } else if (m is MethodDeclaration && (m.isAbstract || generate) && !m.isStatic && !m.isOperator && !_hasAnnotation(m, 'keepAbstract')) {
-          final method = new StringBuffer();
-          if (m.isSetter){
-            final SimpleFormalParameter param = m.parameters.parameters.first;
-            _writeSetter(method, m.name.name, m.returnType, param.type, access: access, paramName: param.identifier.name);
-          } else if (m.isGetter) {
-            _writeGetter(method, m.name.name, m.returnType, access: access);
-          } else {
-            if (m.returnType != null) {
-              method..write(m.returnType)..write(' ');
-            }
-            method..write(m.name)..write(m.parameters)..write(_handleReturn("\$unsafe.callMethod('${m.name.name}'" +
-                (m.parameters.parameters.isEmpty ? ")" : ", [${m.parameters.parameters.map(_handleFormalParameter).join(', ')}])"), m.returnType));
-          }
-          result.add(new _Transformation(m.offset, m.end, method.toString()));
+        // remove @keepAbstract or abstract
+        final keepAbstract = _hasAnnotation(declaration, 'keepAbstract');
+        if (keepAbstract) {
+          _removeMetadata(result, declaration, (m) => m.name.name == 'keepAbstract');
+        } else if (declaration.abstractKeyword != null) {
+          final abstractKeyword = declaration.abstractKeyword;
+          _removeToken(result, abstractKeyword);
         }
-      });
+
+        // add cast and constructor
+        final name = declaration.name;
+        final position = declaration.leftBracket.offset;
+        final alreadyExtends = declaration.extendsClause != null;
+        result.add(new _Transformation(position, position + 1,
+            (alreadyExtends ? '' : 'extends jsw.TypedJsObject ') + '{' +
+            (skipCast || keepAbstract ? '' : '\n  static $name cast(js.JsObject jsObject) => jsObject == null ? null : new $name.fromJsObject(jsObject);') +
+            (skipConstructor ? '' : '\n  $name.fromJsObject(js.JsObject jsObject) : super.fromJsObject(jsObject);')
+            ));
+
+        // generate constructors
+        // generate member
+        declaration.members.forEach((m){
+          final access = forMethodsOnClass || _hasAnnotation(m, 'forMethods') ? forMethods :
+            namesWithUnderscoresOnClass || _hasAnnotation(m, 'namesWithUnderscores') ? namesWithUnderscores : null;
+          final generate = _hasAnnotation(m, 'generate');
+          _removeMetadata(result, declaration, (m) => m.name.name == 'generate');
+          if (m is ConstructorDeclaration && generate) {
+            final constr = new StringBuffer();
+            constr
+              ..write(m.returnType)
+              ..write(m.name == null ? '' : '.${m.name}')
+              ..write(m.parameters)
+              ..write(':');
+            if (m.initializers.isNotEmpty) {
+              constr.write(m.initializers.where((e) => e is! SuperConstructorInvocation).join(','));
+              constr.write(',');
+            }
+            constr
+              ..write("super(${dartConstructorNS != null ? dartConstructorNS : 'js.context'}['${m.returnType}'], [${m.parameters.parameters.map(_handleFormalParameter).join(', ')}])")
+              ..write(m.body != null ? m.body : ';');
+            result.add(new _Transformation(m.offset, m.end, constr.toString()));
+          } else if (m is FieldDeclaration) {
+            final content = new StringBuffer();
+            final type = m.fields.type;
+            for (final v in m.fields.variables) {
+              final name = v.name.name;
+              if (name.startsWith('_')) {
+                return; // skip fieldDeclaration
+              } else {
+                _writeSetter(content, name, null, type, access: access);
+                content.write('\n');
+                _writeGetter(content, name, type, access: access);
+                content.write('\n');
+              }
+            }
+            result.add(new _Transformation(m.offset, m.endToken.next.offset, content.toString()));
+          } else if (m is MethodDeclaration && m.name.name == 'cast') {
+            if (!skipCast) {
+              _removeNode(result, m);
+            }
+          } else if (m is MethodDeclaration && (m.isAbstract || generate) && !m.isStatic && !m.isOperator && !_hasAnnotation(m, 'keepAbstract')) {
+            final method = new StringBuffer();
+            if (m.isSetter){
+              final SimpleFormalParameter param = m.parameters.parameters.first;
+              _writeSetter(method, m.name.name, m.returnType, param.type, access: access, paramName: param.identifier.name);
+            } else if (m.isGetter) {
+              _writeGetter(method, m.name.name, m.returnType, access: access);
+            } else {
+              if (m.returnType != null) {
+                method..write(m.returnType)..write(' ');
+              }
+              method..write(m.name)..write(m.parameters)..write(_handleReturn("\$unsafe.callMethod('${m.name.name}'" +
+                  (m.parameters.parameters.isEmpty ? ")" : ", [${m.parameters.parameters.map(_handleFormalParameter).join(', ')}])"), m.returnType));
+            }
+            result.add(new _Transformation(m.offset, m.end, method.toString()));
+          }
+        });
+      }
     }
+    return result;
   }
-  return result;
 }
 
 void _writeSetter(StringBuffer sb, String name, TypeName returnType, TypeName paramType, {_PropertyMapping access, paramName: null}) {
