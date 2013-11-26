@@ -57,4 +57,5 @@ class Person extends jsw.TypedJsObject {
   void m9(dynamic value) {
     $unsafe.callMethod('m9', [value == null ? null : value is Person ? value.$unsafe : value is num ? value : throw "bad type"]);
   }
+  List<Enum> m10() => jsw.TypedJsArray.cast($unsafe.callMethod('m10'), new jsw.TranslatorForIsEnum<int, Enum>(Enum.find));
 }

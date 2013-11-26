@@ -37,4 +37,5 @@ class Enum extends jsw.IsEnum<int> {
   void m7([List l]);
   Enum m8();
   void m9(@Types(const [Person, num]) dynamic value);
+  List<Enum> m10();
 }

@@ -29,6 +29,7 @@ import 'package:path/path.dart' as p;
 
 const _LIBRARY_NAME = 'js_wrapping.dart_generator';
 
+// TODO add handling of "dynamic/*String|Type*/" syntax
 // TODO handle dynamic/*String|Type*/ on returned value see MapTypeControlOptions.mapTypeIds
 // TODO add @withInstanceOf
 // TODO add @remove to avoid super.method() - see MVCArray
@@ -346,13 +347,18 @@ String _handleReturn(String content, TypeName returnType) {
       wrap = (String s) => ' { $s; }';
     } else if (returnType.type.element != null) {
       if (_isTypeTypedWith(returnType.type, 'dart.core', 'List')) {
+        // List<?> or List
         if (returnType.typeArguments != null && _isTypeAssignableWith(returnType.typeArguments.arguments.first.type, 'js_wrapping', 'TypedJsObject')) {
+          // List<T extends TypedJsObject>
           final genericType = returnType.typeArguments.arguments.first;
           wrap = (String s) => ' => jsw.TypedJsArray.cast($s, new jsw.TranslatorForTypedJsObject<$genericType>($genericType.cast));';
-        } else if (returnType.typeArguments != null && _isTypeAssignableWith(returnType.typeArguments.arguments.first.type, 'js_wrapping', 'TypedJsObject')) {
+        } else if (returnType.typeArguments != null && _isTypeAssignableWith(returnType.typeArguments.arguments.first.type, 'js_wrapping', 'IsEnum')) {
+          // List<T extends IsEnum<S>>
           final genericType = returnType.typeArguments.arguments.first;
-          wrap = (String s) => ' => jsw.TypedJsArray.cast($s, new jsw.TranslatorForIsEnum<$genericType>($genericType.find));';
+          final wrappedType = (genericType.type.element as ClassElement).allSupertypes.firstWhere((e) => _isTypeTypedWith(e, 'js_wrapping', 'IsEnum')).typeArguments.first;
+          wrap = (String s) => ' => jsw.TypedJsArray.cast($s, new jsw.TranslatorForIsEnum<$wrappedType, $genericType>($genericType.find));';
         } else {
+          // List or List<T>
           wrap = (String s) => ' => jsw.TypedJsArray.cast($s);';
         }
       } else if (_isTypeAssignableWith(returnType.type, 'js_wrapping', 'IsEnum')) {
