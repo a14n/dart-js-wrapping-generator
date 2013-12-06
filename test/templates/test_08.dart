@@ -27,7 +27,8 @@ class Enum extends jsw.IsEnum<int> {
   List get g5;
   DateTime get g6;
   Enum get g7;
-  @Types(const [Person, num]) dynamic get g8;
+  @Types(const [Enum, int]) dynamic get g8;
+  @Types(const [Person, num]) dynamic get g9;
   String m1();
   void m2();
   m3();

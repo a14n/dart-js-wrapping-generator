@@ -33,6 +33,7 @@ const _LIBRARY_NAME = 'js_wrapping.dart_generator';
 // TODO handle dynamic/*String|Type*/ on returned value see MapTypeControlOptions.mapTypeIds
 // TODO add @withInstanceOf
 // TODO add @remove to avoid super.method() - see MVCArray
+// TODO remove @wrapper ?
 
 const wrapper = const _Wrapper();
 class _Wrapper {
@@ -205,7 +206,7 @@ class Generator {
               } else {
                 _writeSetterForField(content, name, type, metadatas, access: access);
                 content.write('\n');
-                _writeGetter(content, name, type, access: access);
+                _writeGetter(content, name, type, metadatas, access: access);
                 content.write('\n');
               }
             }
@@ -219,13 +220,13 @@ class Generator {
             if (m.isSetter){
               _writeSetterForSetter(method, m, access: access);
             } else if (m.isGetter) {
-              _writeGetter(method, m.name.name, m.returnType, access: access);
+              _writeGetter(method, m.name.name, m.returnType, m.metadata, access: access);
             } else {
               if (m.returnType != null) {
                 method..write(m.returnType)..write(' ');
               }
               method..write(m.name)..write(m.parameters)..write(_handleReturn("\$unsafe.callMethod('${m.name.name}'" +
-                  (m.parameters.parameters.isEmpty ? ")" : ", [${m.parameters.parameters.map(_handleFormalParameter).join(', ')}])"), m.returnType));
+                  (m.parameters.parameters.isEmpty ? ")" : ", [${m.parameters.parameters.map(_handleFormalParameter).join(', ')}])"), m.returnType, m.metadata));
             }
             result.add(new _Transformation(m.offset, m.end, method.toString()));
           }
@@ -257,24 +258,24 @@ void _writeSetter(StringBuffer sb, String name, TypeName returnType, String para
   sb.write('set ${name}(${paramType} ${paramName})');
   if (access == forMethods) {
     final nameCapitalized = _capitalize(name);
-    sb.write(_handleReturn("\$unsafe.callMethod('set${nameCapitalized}', [${value}])", returnType));
+    sb.write(_handleReturn("\$unsafe.callMethod('set${nameCapitalized}', [${value}])", returnType, []));
   } else if (access == namesWithUnderscores) {
     final nameWithUnderscores = _withUnderscores(name);
-    sb.write(_handleReturn("\$unsafe['${nameWithUnderscores}'] = ${value}", returnType));
+    sb.write(_handleReturn("\$unsafe['${nameWithUnderscores}'] = ${value}", returnType, []));
   } else {
-    sb.write(_handleReturn("\$unsafe['${name}'] = ${value}", returnType));
+    sb.write(_handleReturn("\$unsafe['${name}'] = ${value}", returnType, []));
   }
 }
 
-void _writeGetter(StringBuffer content, String name, TypeName returnType, {_PropertyMapping access}) {
+void _writeGetter(StringBuffer content, String name, TypeName returnType, NodeList<Annotation> metadatas, {_PropertyMapping access}) {
   if (access == forMethods) {
     final nameCapitalized = _capitalize(name);
-    content..write("${returnType} get ${name}${_handleReturn("\$unsafe.callMethod('get${nameCapitalized}')", returnType)}");
+    content..write("${returnType} get ${name}${_handleReturn("\$unsafe.callMethod('get${nameCapitalized}')", returnType, metadatas)}");
   } else if (access == namesWithUnderscores) {
     final nameWithUnderscores = _withUnderscores(name);
-    content..write("${returnType} get ${name}${_handleReturn("\$unsafe['${nameWithUnderscores}']", returnType)}");
+    content..write("${returnType} get ${name}${_handleReturn("\$unsafe['${nameWithUnderscores}']", returnType, metadatas)}");
   } else {
-    content..write("${returnType} get ${name}${_handleReturn("\$unsafe['${name}']", returnType)}");
+    content..write("${returnType} get ${name}${_handleReturn("\$unsafe['${name}']", returnType, metadatas)}");
   }
 }
 
@@ -309,10 +310,10 @@ String _mayTransformParameter(String name, Type2 type, List<Annotation> metadata
   }
   final filterTypesMetadata = (Annotation a) => _isElementTypedWith(a.element is ConstructorElement ? a.element.enclosingElement : a.element, _LIBRARY_NAME, 'Types');
   if (metadatas.any(filterTypesMetadata)) {
-    final Annotation types = metadatas.firstWhere(filterTypesMetadata);
+    final types = metadatas.firstWhere(filterTypesMetadata);
     final ListLiteral listOfTypes = types.arguments.arguments.first;
     return listOfTypes.elements.map((SimpleIdentifier e){
-      ClassElement classElement = _getClassElement(e.name, e.staticElement.library);
+      final classElement = _getClassElement(e.name, e.staticElement.library);
       final value = _mayTransformParameter(name, classElement.type, []);
       return '${name} is ${e.name} ? ' + (value != null ? value : name) + ' : ';
     }).join() + ' throw "bad type"';
@@ -340,7 +341,7 @@ ClassElement _getClassElement(String name, LibraryElement library) {
   }
 }
 
-String _handleReturn(String content, TypeName returnType) {
+String _handleReturn(String content, TypeName returnType, List<Annotation> metadatas) {
   var wrap = (String s) => ' => $s;';
   if (returnType != null) {
     if (_isVoid(returnType)) {
@@ -365,6 +366,29 @@ String _handleReturn(String content, TypeName returnType) {
         wrap = (String s) => ' => ${returnType}.find($s);';
       } else if (_isTypeAssignableWith(returnType.type, 'js_wrapping', 'TypedJsObject')) {
         wrap = (String s) => ' => ${returnType}.cast($s);';
+      }
+    }
+    if (returnType.type.element == null || returnType.type.isDynamic) {
+      final filterTypesMetadata = (Annotation a) => _isElementTypedWith(a.element is ConstructorElement ? a.element.enclosingElement : a.element, _LIBRARY_NAME, 'Types');
+      if (metadatas.any(filterTypesMetadata)) {
+        String t = '(v0) => v0';
+        int i = 1;
+        final types = metadatas.firstWhere(filterTypesMetadata);
+        final ListLiteral listOfTypes = types.arguments.arguments.first;
+        listOfTypes.elements.reversed.forEach((SimpleIdentifier e){
+          final classElement = _getClassElement(e.name, e.staticElement.library);
+          if (_isTypeAssignableWith(classElement.type, 'js_wrapping', 'IsEnum')) {
+            t = '(v${i+1}) => ((v$i) => v$i != null ? v$i : ($t)(v${i+1}))(${classElement}.find(v${i+1}))';
+            i += 2;
+          } else if (_isTypeAssignableWith(classElement.type, 'js_wrapping', 'TypedJsObject')) {
+            t = '(v$i) => $classElement.isInstance(v$i) ? v$i : ($t)(v$i)';
+            i++;
+          } else {
+            t = '(v$i) => v$i is $classElement ? v$i : ($t)(v$i)';
+            i++;
+          }
+        });
+        wrap = (String s) => ' => ($t)($s)';
       }
     }
   }

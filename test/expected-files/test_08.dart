@@ -39,7 +39,8 @@ class Person extends jsw.TypedJsObject {
   List get g5 => jsw.TypedJsArray.cast($unsafe['g5']);
   DateTime get g6 => $unsafe['g6'];
   Enum get g7 => Enum.find($unsafe['g7']);
-  dynamic get g8 => $unsafe['g8'];
+  dynamic get g8 => ((v3) => ((v2) => v2 != null ? v2 : ((v1) => v1 is int ? v1 : ((v0) => v0)(v1))(v3))(Enum.find(v3)))($unsafe['g8']);
+  dynamic get g9 => ((v2) => Person.isInstance(v2) ? v2 : ((v1) => v1 is num ? v1 : ((v0) => v0)(v1))(v2))($unsafe['g9']);
   String m1() => $unsafe.callMethod('m1');
   void m2() {
     $unsafe.callMethod('m2');
