@@ -4,16 +4,17 @@ import 'package:js_wrapping_generator/dart_generator.dart';
 import 'package:js_wrapping/js_wrapping.dart' as jsw;
 
 class Enum extends jsw.IsEnum<int> {
+  static Enum $wrap(int jsValue) => _FINDER.find(jsValue);
+
   static final E1 = new Enum._(1);
 
   static final _FINDER = new jsw.EnumFinder<int, Enum>([E1]);
-
-  static Enum find(Object o) => _FINDER.find(o);
 
   Enum._(int value) : super(value);
 }
 
 @wrapper abstract class Person extends jsw.TypedJsObject {
+  static bool isInstance(js.JsObject o) => o.instanceof(js.context['Person']);
   set s1(String value);
   void set s2(Person value);
   void set s3(DateTime value);

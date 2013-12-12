@@ -6,5 +6,5 @@ import 'package:js_wrapping/js_wrapping.dart' as jsw;
 class Person extends jsw.TypedJsObject {
   Person.fromJsObject(js.JsObject jsObject)
       : super.fromJsObject(jsObject);
-  static Person cast(js.JsObject jsObject) => null;
+  static Person $wrap(js.JsObject jsObject) => null;
 }

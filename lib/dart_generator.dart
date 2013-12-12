@@ -29,11 +29,10 @@ import 'package:path/path.dart' as p;
 
 const _LIBRARY_NAME = 'js_wrapping.dart_generator';
 
-// TODO add handling of "dynamic/*String|Type*/" syntax
-// TODO handle dynamic/*String|Type*/ on returned value see MapTypeControlOptions.mapTypeIds
 // TODO add @withInstanceOf
 // TODO add @remove to avoid super.method() - see MVCArray
 // TODO remove @wrapper ?
+// TODO add handling of "dynamic/*String|Type*/" syntax to handle thing like List<String|MapTypeId>
 
 const wrapper = const _Wrapper();
 class _Wrapper {
@@ -45,9 +44,9 @@ class _KeepAbstract {
   const _KeepAbstract();
 }
 
-const skipCast = const _SkipCast();
-class _SkipCast {
-  const _SkipCast();
+const skipWrap = const _SkipWrap();
+class _SkipWrap {
+  const _SkipWrap();
 }
 
 const skipConstructor = const _SkipConstructor();
@@ -79,7 +78,7 @@ class Generator {
   Generator(String packagesDir) {
     _context
       ..analysisOptions.hint = false
-      ..analysisOptions.strictMode = false
+      ..analysisOptions.dart2jsHint = false
       ..sourceFactory = new SourceFactory.con2([
           new DartUriResolver(DirectoryBasedDartSdk.defaultSdk),
           new FileUriResolver(),
@@ -146,9 +145,9 @@ class Generator {
         final namesWithUnderscoresOnClass = _hasAnnotation(declaration, 'namesWithUnderscores');
         _removeMetadata(result, declaration, (m) => m.name.name == 'namesWithUnderscores');
 
-        // @skipCast on class
-        final skipCast = _hasAnnotation(declaration, 'skipCast');
-        _removeMetadata(result, declaration, (m) => m.name.name == 'skipCast');
+        // @skipWrap on class
+        final skipWrap = _hasAnnotation(declaration, 'skipWrap');
+        _removeMetadata(result, declaration, (m) => m.name.name == 'skipWrap');
 
         // @skipConstructor on class
         final skipConstructor = _hasAnnotation(declaration, 'skipConstructor');
@@ -169,7 +168,7 @@ class Generator {
         final alreadyExtends = declaration.extendsClause != null;
         result.add(new _Transformation(position, position + 1,
             (alreadyExtends ? '' : 'extends jsw.TypedJsObject ') + '{' +
-            (skipCast || keepAbstract ? '' : '\n  static $name cast(js.JsObject jsObject) => jsObject == null ? null : new $name.fromJsObject(jsObject);') +
+            (skipWrap || keepAbstract ? '' : '\n  static $name \$wrap(js.JsObject jsObject) => jsObject == null ? null : new $name.fromJsObject(jsObject);') +
             (skipConstructor ? '' : '\n  $name.fromJsObject(js.JsObject jsObject) : super.fromJsObject(jsObject);')
             ));
 
@@ -211,8 +210,8 @@ class Generator {
               }
             }
             result.add(new _Transformation(m.offset, m.endToken.next.offset, content.toString()));
-          } else if (m is MethodDeclaration && m.name.name == 'cast') {
-            if (!skipCast) {
+          } else if (m is MethodDeclaration && m.name.name == '\$wrap') {
+            if (!skipWrap) {
               _removeNode(result, m);
             }
           } else if (m is MethodDeclaration && (m.isAbstract || generate) && !m.isStatic && !m.isOperator && !_hasAnnotation(m, 'keepAbstract')) {
@@ -303,10 +302,10 @@ String _mayTransformParameter(String name, Type2 type, List<Annotation> metadata
     return "(${name} is jsw.TypedJsObject ? (${name} as jsw.TypedJsObject).${r'$unsafe'} : new js.JsObject.jsify(${name}))";
   }
   if (_isTypeAssignableWith(type, 'js_wrapping', 'TypedJsObject')) {
-    return "${name}.${r'$unsafe'}";
+    return '$name.\$unsafe';
   }
   if (_isTypeAssignableWith(type, 'js_wrapping', 'IsEnum')) {
-    return "${name}.value";
+    return '$name.\$unsafe';
   }
   final filterTypesMetadata = (Annotation a) => _isElementTypedWith(a.element is ConstructorElement ? a.element.enclosingElement : a.element, _LIBRARY_NAME, 'Types');
   if (metadatas.any(filterTypesMetadata)) {
@@ -349,23 +348,16 @@ String _handleReturn(String content, TypeName returnType, List<Annotation> metad
     } else if (returnType.type.element != null) {
       if (_isTypeTypedWith(returnType.type, 'dart.core', 'List')) {
         // List<?> or List
-        if (returnType.typeArguments != null && _isTypeAssignableWith(returnType.typeArguments.arguments.first.type, 'js_wrapping', 'TypedJsObject')) {
-          // List<T extends TypedJsObject>
+        if (returnType.typeArguments != null && _isTypeAssignableWith(returnType.typeArguments.arguments.first.type, 'js_wrapping', 'Serializable')) {
+          // List<T extends Serializable>
           final genericType = returnType.typeArguments.arguments.first;
-          wrap = (String s) => ' => jsw.TypedJsArray.cast($s, new jsw.TranslatorForTypedJsObject<$genericType>($genericType.cast));';
-        } else if (returnType.typeArguments != null && _isTypeAssignableWith(returnType.typeArguments.arguments.first.type, 'js_wrapping', 'IsEnum')) {
-          // List<T extends IsEnum<S>>
-          final genericType = returnType.typeArguments.arguments.first;
-          final wrappedType = (genericType.type.element as ClassElement).allSupertypes.firstWhere((e) => _isTypeTypedWith(e, 'js_wrapping', 'IsEnum')).typeArguments.first;
-          wrap = (String s) => ' => jsw.TypedJsArray.cast($s, new jsw.TranslatorForIsEnum<$wrappedType, $genericType>($genericType.find));';
+          wrap = (String s) => ' => jsw.TypedJsArray.\$wrapSerializables($s, $genericType.\$wrap);';
         } else {
           // List or List<T>
-          wrap = (String s) => ' => jsw.TypedJsArray.cast($s);';
+          wrap = (String s) => ' => jsw.TypedJsArray.\$wrap($s);';
         }
-      } else if (_isTypeAssignableWith(returnType.type, 'js_wrapping', 'IsEnum')) {
-        wrap = (String s) => ' => ${returnType}.find($s);';
-      } else if (_isTypeAssignableWith(returnType.type, 'js_wrapping', 'TypedJsObject')) {
-        wrap = (String s) => ' => ${returnType}.cast($s);';
+      } else if (_isTypeAssignableWith(returnType.type, 'js_wrapping', 'Serializable')) {
+        wrap = (String s) => ' => ${returnType}.\$wrap($s);';
       }
     }
     if (returnType.type.element == null || returnType.type.isDynamic) {
@@ -378,17 +370,17 @@ String _handleReturn(String content, TypeName returnType, List<Annotation> metad
         listOfTypes.elements.reversed.forEach((SimpleIdentifier e){
           final classElement = _getClassElement(e.name, e.staticElement.library);
           if (_isTypeAssignableWith(classElement.type, 'js_wrapping', 'IsEnum')) {
-            t = '(v${i+1}) => ((v$i) => v$i != null ? v$i : ($t)(v${i+1}))(${classElement}.find(v${i+1}))';
+            t = '(v${i+1}) => ((v$i) => v$i != null ? v$i : ($t)(v${i+1}))($classElement.\$wrap(v${i+1}))';
             i += 2;
           } else if (_isTypeAssignableWith(classElement.type, 'js_wrapping', 'TypedJsObject')) {
-            t = '(v$i) => $classElement.isInstance(v$i) ? v$i : ($t)(v$i)';
+            t = '(v$i) => $classElement.isInstance(v$i) ? $classElement.\$wrap(v$i) : ($t)(v$i)';
             i++;
           } else {
             t = '(v$i) => v$i is $classElement ? v$i : ($t)(v$i)';
             i++;
           }
         });
-        wrap = (String s) => ' => ($t)($s)';
+        wrap = (String s) => ' => ($t)($s);';
       }
     }
   }

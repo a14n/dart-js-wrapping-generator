@@ -4,5 +4,5 @@ import 'package:js_wrapping_generator/dart_generator.dart';
 import 'package:js_wrapping/js_wrapping.dart' as jsw;
 
 @wrapper abstract class Person extends jsw.TypedJsObject {
-  static Person cast(js.JsObject jsObject) => null;
+  static Person $wrap(js.JsObject jsObject) => null;
 }

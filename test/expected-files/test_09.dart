@@ -4,20 +4,19 @@ import 'package:js_wrapping_generator/dart_generator.dart';
 import 'package:js_wrapping/js_wrapping.dart' as jsw;
 
 class Enum extends jsw.IsEnum<int> {
+  static Enum $wrap(int jsValue) => _FINDER.find(jsValue);
+
   static final E1 = new Enum._(1);
 
   static final _FINDER = new jsw.EnumFinder<int, Enum>([E1]);
-
-  static Enum find(Object o) => _FINDER.find(o);
 
   Enum._(int value)
       : super(value);
 }
 
 class Person extends jsw.TypedJsObject {
-  static Person cast(js.JsObject jsObject) => jsObject == null ? null : new Person.fromJsObject(jsObject);
-  Person.fromJsObject(js.JsObject jsObject)
-      : super.fromJsObject(jsObject);
+  static Person $wrap(js.JsObject jsObject) => jsObject == null ? null : new Person.fromJsObject(jsObject);
+  Person.fromJsObject(js.JsObject jsObject) : super.fromJsObject(jsObject);
   set f1(String f1) => $unsafe['f1'] = f1;
   String get f1 => $unsafe['f1'];
   set f2(String f2) => $unsafe.callMethod('setF2', [f2]);
@@ -27,15 +26,15 @@ class Person extends jsw.TypedJsObject {
   set f4(String f4) => $unsafe['f4'] = f4;
   String get f4 => $unsafe['f4'];
   set f5(Person f5) => $unsafe['f5'] = f5 == null ? null : f5.$unsafe;
-  Person get f5 => Person.cast($unsafe['f5']);
+  Person get f5 => Person.$wrap($unsafe['f5']);
   set f6(List<Person> f6) => $unsafe['f6'] = f6 == null ? null : (f6 is jsw.TypedJsObject ? (f6 as jsw.TypedJsObject).$unsafe : new js.JsObject.jsify(f6));
-  List<Person> get f6 => jsw.TypedJsArray.cast($unsafe['f6'], new jsw.TranslatorForTypedJsObject<Person>(Person.cast));
+  List<Person> get f6 => jsw.TypedJsArray.$wrapSerializables($unsafe['f6'], Person.$wrap);
   set f7(List<String> f7) => $unsafe['f7'] = f7 == null ? null : (f7 is jsw.TypedJsObject ? (f7 as jsw.TypedJsObject).$unsafe : new js.JsObject.jsify(f7));
-  List<String> get f7 => jsw.TypedJsArray.cast($unsafe['f7']);
+  List<String> get f7 => jsw.TypedJsArray.$wrap($unsafe['f7']);
   set f8(List f8) => $unsafe['f8'] = f8 == null ? null : (f8 is jsw.TypedJsObject ? (f8 as jsw.TypedJsObject).$unsafe : new js.JsObject.jsify(f8));
-  List get f8 => jsw.TypedJsArray.cast($unsafe['f8']);
+  List get f8 => jsw.TypedJsArray.$wrap($unsafe['f8']);
   set f9Rox(String f9Rox) => $unsafe['f9_rox'] = f9Rox;
   String get f9Rox => $unsafe['f9_rox'];
-  set f10(Enum f10) => $unsafe['f10'] = f10 == null ? null : f10.value;
-  Enum get f10 => Enum.find($unsafe['f10']);
+  set f10(Enum f10) => $unsafe['f10'] = f10 == null ? null : f10.$unsafe;
+  Enum get f10 => Enum.$wrap($unsafe['f10']);
 }
