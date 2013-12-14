@@ -1,4 +1,5 @@
 import 'dart:js' as js;
+import 'dart:html' as html;
 
 import 'package:js_wrapping_generator/dart_generator.dart';
 import 'package:js_wrapping/js_wrapping.dart' as jsw;
@@ -27,14 +28,16 @@ class Person extends jsw.TypedJsObject {
   String get f4 => $unsafe['f4'];
   set f5(Person f5) => $unsafe['f5'] = f5 == null ? null : f5.$unsafe;
   Person get f5 => Person.$wrap($unsafe['f5']);
-  set f6(List<Person> f6) => $unsafe['f6'] = f6 == null ? null : (f6 is jsw.TypedJsObject ? (f6 as jsw.TypedJsObject).$unsafe : new js.JsObject.jsify(f6));
+  set f6(List<Person> f6) => $unsafe['f6'] = f6 == null ? null : (f6 is jsw.TypedJsObject ? (f6 as jsw.TypedJsObject).$unsafe : jsw.jsify(f6));
   List<Person> get f6 => jsw.TypedJsArray.$wrapSerializables($unsafe['f6'], Person.$wrap);
-  set f7(List<String> f7) => $unsafe['f7'] = f7 == null ? null : (f7 is jsw.TypedJsObject ? (f7 as jsw.TypedJsObject).$unsafe : new js.JsObject.jsify(f7));
+  set f7(List<String> f7) => $unsafe['f7'] = f7 == null ? null : (f7 is jsw.TypedJsObject ? (f7 as jsw.TypedJsObject).$unsafe : jsw.jsify(f7));
   List<String> get f7 => jsw.TypedJsArray.$wrap($unsafe['f7']);
-  set f8(List f8) => $unsafe['f8'] = f8 == null ? null : (f8 is jsw.TypedJsObject ? (f8 as jsw.TypedJsObject).$unsafe : new js.JsObject.jsify(f8));
+  set f8(List f8) => $unsafe['f8'] = f8 == null ? null : (f8 is jsw.TypedJsObject ? (f8 as jsw.TypedJsObject).$unsafe : jsw.jsify(f8));
   List get f8 => jsw.TypedJsArray.$wrap($unsafe['f8']);
   set f9Rox(String f9Rox) => $unsafe['f9_rox'] = f9Rox;
   String get f9Rox => $unsafe['f9_rox'];
   set f10(Enum f10) => $unsafe['f10'] = f10 == null ? null : f10.$unsafe;
   Enum get f10 => Enum.$wrap($unsafe['f10']);
+  set f11(dynamic f11) => $unsafe['f11'] = f11 == null ? null : f11 is html.Node ? f11 : f11 is String ? f11 : throw "bad type";
+  dynamic get f11 => ((v2) => v2 is html.Node ? v2 : ((v1) => v1 is String ? v1 : ((v0) => v0)(v1))(v2))($unsafe['f11']);
 }

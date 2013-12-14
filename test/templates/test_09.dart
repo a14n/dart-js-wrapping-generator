@@ -1,4 +1,5 @@
 import 'dart:js' as js;
+import 'dart:html' as html;
 
 import 'package:js_wrapping_generator/dart_generator.dart';
 import 'package:js_wrapping/js_wrapping.dart' as jsw;
@@ -23,4 +24,5 @@ class Enum extends jsw.IsEnum<int> {
   List f8;
   @namesWithUnderscores String f9Rox;
   Enum f10;
+  @Types(const [html.Node, String]) dynamic f11;
 }

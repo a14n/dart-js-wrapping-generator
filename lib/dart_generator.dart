@@ -30,6 +30,7 @@ import 'package:path/path.dart' as p;
 const _LIBRARY_NAME = 'js_wrapping.dart_generator';
 
 // TODO add @withInstanceOf
+// TODO instanceof for anoynmous object
 // TODO add @remove to avoid super.method() - see MVCArray
 // TODO remove @wrapper ?
 // TODO add handling of "dynamic/*String|Type*/" syntax to handle thing like List<String|MapTypeId>
@@ -278,10 +279,9 @@ void _writeGetter(StringBuffer content, String name, TypeName returnType, NodeLi
   }
 }
 
-//String _handleFormalParameter(FormalParameter fp) => _handleParameter(fp.identifier.name, fp is SimpleFormalParameter ? fp.type : fp is DefaultFormalParameter && fp.parameter is SimpleFormalParameter ? (fp.parameter as SimpleFormalParameter).type : null);
-
 String _handleFormalParameter(FormalParameter fp) {
   final Type2 paramType = fp.element != null && fp.element.type != null ? fp.element.type : null;
+  if (fp is DefaultFormalParameter) fp = (fp as DefaultFormalParameter).parameter;
   final NodeList<Annotation> annotations = fp is NormalFormalParameter ? fp.metadata : null;
   return _handleParameter(fp.identifier.name, paramType, annotations);
 }
@@ -299,7 +299,7 @@ String _handleParameter(String name, Type2 type, NodeList<Annotation> metadatas)
 String _mayTransformParameter(String name, Type2 type, List<Annotation> metadatas) {
   if (_isTypeAssignableWith(type, 'dart.core', 'List') ||
       _isTypeAssignableWith(type, 'dart.core', 'Map')) {
-    return "(${name} is jsw.TypedJsObject ? (${name} as jsw.TypedJsObject).${r'$unsafe'} : new js.JsObject.jsify(${name}))";
+    return "(${name} is jsw.TypedJsObject ? (${name} as jsw.TypedJsObject).${r'$unsafe'} : jsw.jsify(${name}))";
   }
   if (_isTypeAssignableWith(type, 'js_wrapping', 'TypedJsObject')) {
     return '$name.\$unsafe';
@@ -308,36 +308,16 @@ String _mayTransformParameter(String name, Type2 type, List<Annotation> metadata
     return '$name.\$unsafe';
   }
   final filterTypesMetadata = (Annotation a) => _isElementTypedWith(a.element is ConstructorElement ? a.element.enclosingElement : a.element, _LIBRARY_NAME, 'Types');
-  if (metadatas.any(filterTypesMetadata)) {
+  if (metadatas != null && metadatas.any(filterTypesMetadata)) {
     final types = metadatas.firstWhere(filterTypesMetadata);
     final ListLiteral listOfTypes = types.arguments.arguments.first;
-    return listOfTypes.elements.map((SimpleIdentifier e){
-      final classElement = _getClassElement(e.name, e.staticElement.library);
+    return listOfTypes.elements.map((Identifier e){
+      final ClassElement classElement = e.staticElement;
       final value = _mayTransformParameter(name, classElement.type, []);
-      return '${name} is ${e.name} ? ' + (value != null ? value : name) + ' : ';
+      return '$name is $e ? ${(value != null ? value : name)} : ';
     }).join() + ' throw "bad type"';
   }
   return null;
-}
-
-ClassElement _getClassElement(String name, LibraryElement library) {
-  final parts = name.split('.');
-  String classPrefix;
-  String className;
-  if (parts.length == 1) {
-    className = parts[0];
-  } else {
-    classPrefix = parts[0];
-    className = parts[1];
-  }
-  for (final import in library.imports) {
-    if (classPrefix == null && import.prefix != null) continue;
-    if (classPrefix != null && import.prefix == null) continue;
-    if (classPrefix != null && import.prefix.name != classPrefix) continue;
-    if (import.combinators.any((c) => c is HideElementCombinator && c.hiddenNames.contains(className))) continue;
-    if (import.combinators.any((c) => c is ShowElementCombinator && !c.shownNames.contains(className))) continue;
-    return import.library.getType(className);
-  }
 }
 
 String _handleReturn(String content, TypeName returnType, List<Annotation> metadatas) {
@@ -367,16 +347,16 @@ String _handleReturn(String content, TypeName returnType, List<Annotation> metad
         int i = 1;
         final types = metadatas.firstWhere(filterTypesMetadata);
         final ListLiteral listOfTypes = types.arguments.arguments.first;
-        listOfTypes.elements.reversed.forEach((SimpleIdentifier e){
-          final classElement = _getClassElement(e.name, e.staticElement.library);
+        listOfTypes.elements.reversed.forEach((Identifier e){
+          final ClassElement classElement = e.staticElement;
           if (_isTypeAssignableWith(classElement.type, 'js_wrapping', 'IsEnum')) {
-            t = '(v${i+1}) => ((v$i) => v$i != null ? v$i : ($t)(v${i+1}))($classElement.\$wrap(v${i+1}))';
+            t = '(v${i+1}) => ((v$i) => v$i != null ? v$i : ($t)(v${i+1}))($e.\$wrap(v${i+1}))';
             i += 2;
           } else if (_isTypeAssignableWith(classElement.type, 'js_wrapping', 'TypedJsObject')) {
-            t = '(v$i) => $classElement.isInstance(v$i) ? $classElement.\$wrap(v$i) : ($t)(v$i)';
+            t = '(v$i) => $e.isInstance(v$i) ? $e.\$wrap(v$i) : ($t)(v$i)';
             i++;
           } else {
-            t = '(v$i) => v$i is $classElement ? v$i : ($t)(v$i)';
+            t = '(v$i) => v$i is $e ? v$i : ($t)(v$i)';
             i++;
           }
         });

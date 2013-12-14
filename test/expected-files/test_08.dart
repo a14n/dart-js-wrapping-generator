@@ -37,9 +37,10 @@ class Person extends jsw.TypedJsObject {
   m3() => $unsafe.callMethod('m3');
   Person m4() => Person.$wrap($unsafe.callMethod('m4'));
   List<Person> m5() => jsw.TypedJsArray.$wrapSerializables($unsafe.callMethod('m5'), Person.$wrap);
-  void m6(List l) { $unsafe.callMethod('m6', [l == null ? null : (l is jsw.TypedJsObject ? (l as jsw.TypedJsObject).$unsafe : new js.JsObject.jsify(l))]); }
-  void m7([List l]) { $unsafe.callMethod('m7', [l == null ? null : (l is jsw.TypedJsObject ? (l as jsw.TypedJsObject).$unsafe : new js.JsObject.jsify(l))]); }
+  void m6(List l) { $unsafe.callMethod('m6', [l == null ? null : (l is jsw.TypedJsObject ? (l as jsw.TypedJsObject).$unsafe : jsw.jsify(l))]); }
+  void m7([List l]) { $unsafe.callMethod('m7', [l == null ? null : (l is jsw.TypedJsObject ? (l as jsw.TypedJsObject).$unsafe : jsw.jsify(l))]); }
   Enum m8() => Enum.$wrap($unsafe.callMethod('m8'));
   void m9(dynamic value) { $unsafe.callMethod('m9', [value == null ? null : value is Person ? value.$unsafe : value is num ? value :  throw "bad type"]); }
   List<Enum> m10() => jsw.TypedJsArray.$wrapSerializables($unsafe.callMethod('m10'), Enum.$wrap);
+  void m11([dynamic value]) { $unsafe.callMethod('m11', [value == null ? null : value is Person ? value.$unsafe : value is num ? value :  throw "bad type"]); }
 }
