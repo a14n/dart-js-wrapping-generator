@@ -292,6 +292,8 @@ String _handleParameter(String name, Type2 type, NodeList<Annotation> metadatas)
     if (transformation != null) {
       return "${name} == null ? null : ${transformation}";
     }
+  } else {
+    return "jsw.mayUnwrap($name)";
   }
   return name;
 }
@@ -316,6 +318,9 @@ String _mayTransformParameter(String name, Type2 type, List<Annotation> metadata
       final value = _mayTransformParameter(name, classElement.type, []);
       return '$name is $e ? ${(value != null ? value : name)} : ';
     }).join() + ' throw "bad type"';
+  }
+  if (type.isDynamic) {
+    return "jsw.mayUnwrap($name)";
   }
   return null;
 }

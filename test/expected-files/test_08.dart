@@ -21,7 +21,7 @@ class Person extends jsw.TypedJsObject {
   void set s2(Person value) { $unsafe['s2'] = value == null ? null : value.$unsafe; }
   void set s3(DateTime value) { $unsafe['s3'] = value; }
   set s4(Enum value) => $unsafe['s4'] = value == null ? null : value.$unsafe;
-  void set s5(dynamic value) { $unsafe['s5'] = value; }
+  void set s5(dynamic value) { $unsafe['s5'] = value == null ? null : jsw.mayUnwrap(value); }
   void set s6(dynamic value) { $unsafe['s6'] = value == null ? null : value is Person ? value.$unsafe : value is num ? value :  throw "bad type"; }
   String get g1 => $unsafe['g1'];
   Person get g2 => Person.$wrap($unsafe['g2']);
@@ -43,4 +43,5 @@ class Person extends jsw.TypedJsObject {
   void m9(dynamic value) { $unsafe.callMethod('m9', [value == null ? null : value is Person ? value.$unsafe : value is num ? value :  throw "bad type"]); }
   List<Enum> m10() => jsw.TypedJsArray.$wrapSerializables($unsafe.callMethod('m10'), Enum.$wrap);
   void m11([dynamic value]) { $unsafe.callMethod('m11', [value == null ? null : value is Person ? value.$unsafe : value is num ? value :  throw "bad type"]); }
+  void m12(value) { $unsafe.callMethod('m12', [value == null ? null : jsw.mayUnwrap(value)]); }
 }
