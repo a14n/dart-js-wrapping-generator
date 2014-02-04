@@ -21,8 +21,8 @@ class Person extends jsw.TypedJsObject {
   void set s2(Person value) { $unsafe['s2'] = value == null ? null : value.$unsafe; }
   void set s3(DateTime value) { $unsafe['s3'] = value; }
   set s4(Enum value) => $unsafe['s4'] = value == null ? null : value.$unsafe;
-  void set s5(dynamic value) { $unsafe['s5'] = value == null ? null : jsw.mayUnwrap(value); }
-  void set s6(dynamic value) { $unsafe['s6'] = value == null ? null : value is Person ? value.$unsafe : value is num ? value :  throw "bad type"; }
+  void set s5(dynamic value) { $unsafe['s5'] = jsw.jsify(value); }
+  void set s6(dynamic value) { $unsafe['s6'] = value is Person ? value.$unsafe : value is num ? value : value == null ? null : throw "bad type"; }
   String get g1 => $unsafe['g1'];
   Person get g2 => Person.$wrap($unsafe['g2']);
   List<Person> get g3 => jsw.TypedJsArray.$wrapSerializables($unsafe['g3'], Person.$wrap);
@@ -37,11 +37,11 @@ class Person extends jsw.TypedJsObject {
   m3() => $unsafe.callMethod('m3');
   Person m4() => Person.$wrap($unsafe.callMethod('m4'));
   List<Person> m5() => jsw.TypedJsArray.$wrapSerializables($unsafe.callMethod('m5'), Person.$wrap);
-  void m6(List l) { $unsafe.callMethod('m6', [l == null ? null : (l is jsw.TypedJsObject ? (l as jsw.TypedJsObject).$unsafe : jsw.jsify(l))]); }
-  void m7([List l]) { $unsafe.callMethod('m7', [l == null ? null : (l is jsw.TypedJsObject ? (l as jsw.TypedJsObject).$unsafe : jsw.jsify(l))]); }
+  void m6(List l) { $unsafe.callMethod('m6', [jsw.jsify(l)]); }
+  void m7([List l]) { $unsafe.callMethod('m7', [jsw.jsify(l)]); }
   Enum m8() => Enum.$wrap($unsafe.callMethod('m8'));
-  void m9(dynamic value) { $unsafe.callMethod('m9', [value == null ? null : value is Person ? value.$unsafe : value is num ? value :  throw "bad type"]); }
+  void m9(dynamic value) { $unsafe.callMethod('m9', [value is Person ? value.$unsafe : value is num ? value : value == null ? null : throw "bad type"]); }
   List<Enum> m10() => jsw.TypedJsArray.$wrapSerializables($unsafe.callMethod('m10'), Enum.$wrap);
-  void m11([dynamic value]) { $unsafe.callMethod('m11', [value == null ? null : value is Person ? value.$unsafe : value is num ? value :  throw "bad type"]); }
-  void m12(value) { $unsafe.callMethod('m12', [value == null ? null : jsw.mayUnwrap(value)]); }
+  void m11([dynamic value]) { $unsafe.callMethod('m11', [value is Person ? value.$unsafe : value is num ? value : value == null ? null : throw "bad type"]); }
+  void m12(value) { $unsafe.callMethod('m12', [jsw.jsify(value)]); }
 }

@@ -286,43 +286,24 @@ String _handleFormalParameter(FormalParameter fp) {
   return _handleParameter(fp.identifier.name, paramType, annotations);
 }
 
-String _handleParameter(String name, Type2 type, NodeList<Annotation> metadatas) {
-  if (type != null) {
-    final transformation = _mayTransformParameter(name, type, metadatas);
-    if (transformation != null) {
-      return "${name} == null ? null : ${transformation}";
-    }
-  } else {
-    return "jsw.mayUnwrap($name)";
-  }
-  return name;
-}
+String _handleParameter(String name, Type2 type, NodeList<Annotation> metadatas) =>
+    type != null ? _mayTransformParameter(name, type, metadatas) : "jsw.jsify($name)";
 
-String _mayTransformParameter(String name, Type2 type, List<Annotation> metadatas) {
-  if (_isTypeAssignableWith(type, 'dart.core', 'List') ||
-      _isTypeAssignableWith(type, 'dart.core', 'Map')) {
-    return "(${name} is jsw.TypedJsObject ? (${name} as jsw.TypedJsObject).${r'$unsafe'} : jsw.jsify(${name}))";
-  }
-  if (_isTypeAssignableWith(type, 'js_wrapping', 'TypedJsObject')) {
-    return '$name.\$unsafe';
-  }
-  if (_isTypeAssignableWith(type, 'js_wrapping', 'IsEnum')) {
-    return '$name.\$unsafe';
-  }
+String _mayTransformParameter(String name, Type2 type, List<Annotation> metadatas, {skipNull: false}) {
+  if (_isTypeSerializable(type)) return skipNull ? "$name.\$unsafe" : "$name == null ? null : $name.\$unsafe";
+  if (_isTypeTransferable(type)) return name;
+  if (_isTypeJsObject(type)) return name;
   final filterTypesMetadata = (Annotation a) => _isElementTypedWith(a.element is ConstructorElement ? a.element.enclosingElement : a.element, _LIBRARY_NAME, 'Types');
   if (metadatas != null && metadatas.any(filterTypesMetadata)) {
     final types = metadatas.firstWhere(filterTypesMetadata);
     final ListLiteral listOfTypes = types.arguments.arguments.first;
     return listOfTypes.elements.map((Identifier e){
       final ClassElement classElement = e.staticElement;
-      final value = _mayTransformParameter(name, classElement.type, []);
+      final value = _mayTransformParameter(name, classElement.type, [], skipNull: true);
       return '$name is $e ? ${(value != null ? value : name)} : ';
-    }).join() + ' throw "bad type"';
+    }).join() + ' $name == null ? null : throw "bad type"';
   }
-  if (type.isDynamic) {
-    return "jsw.mayUnwrap($name)";
-  }
-  return null;
+  return "jsw.jsify($name)";
 }
 
 String _handleReturn(String content, TypeName returnType, List<Annotation> metadatas) {
@@ -333,7 +314,7 @@ String _handleReturn(String content, TypeName returnType, List<Annotation> metad
     } else if (returnType.type.element != null) {
       if (_isTypeTypedWith(returnType.type, 'dart.core', 'List')) {
         // List<?> or List
-        if (returnType.typeArguments != null && _isTypeAssignableWith(returnType.typeArguments.arguments.first.type, 'js_wrapping', 'Serializable')) {
+        if (returnType.typeArguments != null && _isTypeSerializable(returnType.typeArguments.arguments.first.type)) {
           // List<T extends Serializable>
           final genericType = returnType.typeArguments.arguments.first;
           wrap = (String s) => ' => jsw.TypedJsArray.\$wrapSerializables($s, $genericType.\$wrap);';
@@ -341,7 +322,7 @@ String _handleReturn(String content, TypeName returnType, List<Annotation> metad
           // List or List<T>
           wrap = (String s) => ' => jsw.TypedJsArray.\$wrap($s);';
         }
-      } else if (_isTypeAssignableWith(returnType.type, 'js_wrapping', 'Serializable')) {
+      } else if (_isTypeSerializable(returnType.type)) {
         wrap = (String s) => ' => ${returnType}.\$wrap($s);';
       }
     }
@@ -371,6 +352,27 @@ String _handleReturn(String content, TypeName returnType, List<Annotation> metad
   }
   return wrap(content);
 }
+
+/// return [true] if the type is transferable through dart:js (see https://api.dartlang.org/docs/channels/stable/latest/dart_js.html)
+bool _isTypeTransferable(Type2 type) {
+  final transferables = <String, List<String>>{
+    'dart.core': ['num', 'bool', 'String', 'DateTime'],
+    'dart.dom.html': ['Blob', 'Event', 'ImageData', 'Node', 'Window'],
+    'dart.dom.indexed_db': ['KeyRange'],
+    'dart.typed_data': ['TypedData'],
+  };
+  for (final libraryName in transferables.keys) {
+    if (transferables[libraryName].any((className) =>
+        _isTypeAssignableWith(type, libraryName, className))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool _isTypeSerializable(Type2 type) => type != null && _isTypeAssignableWith(type, 'js_wrapping', 'Serializable');
+
+bool _isTypeJsObject(Type2 type) => type != null && _isTypeAssignableWith(type, 'dart.js', 'JsObject');
 
 bool _isVoid(TypeName typeName) => typeName.type.name == 'void';
 
