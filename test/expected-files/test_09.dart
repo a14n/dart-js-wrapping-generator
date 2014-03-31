@@ -11,8 +11,7 @@ class Enum extends jsw.IsEnum<int> {
 
   static final _FINDER = new jsw.EnumFinder<int, Enum>([E1]);
 
-  Enum._(int value)
-      : super(value);
+  Enum._(int value): super(value);
 }
 
 class Person extends jsw.TypedJsObject {

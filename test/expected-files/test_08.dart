@@ -15,7 +15,7 @@ class Enum extends jsw.IsEnum<int> {
 
 class Person extends jsw.TypedJsObject {
   static Person $wrap(js.JsObject jsObject) => jsObject == null ? null : new Person.fromJsObject(jsObject);
-  Person.fromJsObject(js.JsObject jsObject) : super.fromJsObject(jsObject);
+  Person.fromJsObject(js.JsObject jsObject): super.fromJsObject(jsObject);
   static bool isInstance(js.JsObject o) => o.instanceof(js.context['Person']);
   set s1(String value) => $unsafe['s1'] = value;
   void set s2(Person value) { $unsafe['s2'] = value == null ? null : value.$unsafe; }
