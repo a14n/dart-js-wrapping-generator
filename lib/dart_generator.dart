@@ -80,7 +80,7 @@ class Generator {
     _context
       ..analysisOptions.hint = false
       ..analysisOptions.dart2jsHint = false
-      ..sourceFactory = new SourceFactory.con2([
+      ..sourceFactory = new SourceFactory([
           new DartUriResolver(DirectoryBasedDartSdk.defaultSdk),
           new FileUriResolver(),
           new PackageUriResolver([new JavaFile(p.absolute('packages'))])]
@@ -125,8 +125,8 @@ class Generator {
 
   /// Parses a Dart file into an AST.
   CompilationUnit parseDartFile(File libraryFile, File file) {
-    final librarySource = new FileBasedSource.con1(_context.sourceFactory.contentCache, new JavaFile(p.absolute(libraryFile.path)));
-    final fileSource = new FileBasedSource.con1(_context.sourceFactory.contentCache, new JavaFile(p.absolute(file.path)));
+    final librarySource = new FileBasedSource.con1(new JavaFile(p.absolute(libraryFile.path)));
+    final fileSource = new FileBasedSource.con1(new JavaFile(p.absolute(file.path)));
     final library = _context.computeLibraryElement(librarySource);
     return _context.resolveCompilationUnit(fileSource, library);
   }
@@ -240,14 +240,14 @@ class Generator {
 void _writeSetterForSetter(StringBuffer sb, MethodDeclaration setter, {_PropertyMapping access}) {
   final FormalParameter param = setter.parameters.parameters.first;
   final NodeList<Annotation> metadatas = param is SimpleFormalParameter ? param.metadata : null;
-  final Type2 paramType = param.element != null && param.element.type != null ? param.element.type : null;
+  final DartType paramType = param.element != null && param.element.type != null ? param.element.type : null;
   final String paramTypeAsString = param is SimpleFormalParameter ? param.type.name.name : '';
   final String paramName = param.identifier.name;
   _writeSetter(sb, setter.name.name, setter.returnType, paramTypeAsString, paramName, _handleParameter(paramName, paramType, metadatas), access: access);
 }
 
 void _writeSetterForField(StringBuffer sb, String name, TypeName type, NodeList<Annotation> metadatas, {_PropertyMapping access}) {
-  final Type2 paramType = type != null && type.type != null ? type.type : null;
+  final DartType paramType = type != null && type.type != null ? type.type : null;
   final String paramTypeAsString = type.toString();
   final String paramName = name;
   _writeSetter(sb, name, null, paramTypeAsString, paramName, _handleParameter(paramName, paramType, metadatas), access: access);
@@ -280,16 +280,16 @@ void _writeGetter(StringBuffer content, String name, TypeName returnType, NodeLi
 }
 
 String _handleFormalParameter(FormalParameter fp) {
-  final Type2 paramType = fp.element != null && fp.element.type != null ? fp.element.type : null;
+  final DartType paramType = fp.element != null && fp.element.type != null ? fp.element.type : null;
   if (fp is DefaultFormalParameter) fp = (fp as DefaultFormalParameter).parameter;
   final NodeList<Annotation> annotations = fp is NormalFormalParameter ? fp.metadata : null;
   return _handleParameter(fp.identifier.name, paramType, annotations);
 }
 
-String _handleParameter(String name, Type2 type, NodeList<Annotation> metadatas) =>
+String _handleParameter(String name, DartType type, NodeList<Annotation> metadatas) =>
     type != null ? _mayTransformParameter(name, type, metadatas) : "jsw.jsify($name)";
 
-String _mayTransformParameter(String name, Type2 type, List<Annotation> metadatas, {skipNull: false}) {
+String _mayTransformParameter(String name, DartType type, List<Annotation> metadatas, {skipNull: false}) {
   if (_isTypeSerializable(type)) return skipNull ? "$name.\$unsafe" : "$name == null ? null : $name.\$unsafe";
   if (_isTypeTransferable(type)) return name;
   if (_isTypeJsObject(type)) return name;
@@ -354,7 +354,7 @@ String _handleReturn(String content, TypeName returnType, List<Annotation> metad
 }
 
 /// return [true] if the type is transferable through dart:js (see https://api.dartlang.org/docs/channels/stable/latest/dart_js.html)
-bool _isTypeTransferable(Type2 type) {
+bool _isTypeTransferable(DartType type) {
   final transferables = <String, List<String>>{
     'dart.core': ['num', 'bool', 'String', 'DateTime'],
     'dart.dom.html': ['Blob', 'Event', 'ImageData', 'Node', 'Window'],
@@ -370,16 +370,16 @@ bool _isTypeTransferable(Type2 type) {
   return false;
 }
 
-bool _isTypeSerializable(Type2 type) => type != null && _isTypeAssignableWith(type, 'js_wrapping', 'Serializable');
+bool _isTypeSerializable(DartType type) => type != null && _isTypeAssignableWith(type, 'js_wrapping', 'Serializable');
 
-bool _isTypeJsObject(Type2 type) => type != null && _isTypeAssignableWith(type, 'dart.js', 'JsObject');
+bool _isTypeJsObject(DartType type) => type != null && _isTypeAssignableWith(type, 'dart.js', 'JsObject');
 
 bool _isVoid(TypeName typeName) => typeName.type.name == 'void';
 
-bool _isTypeAssignableWith(Type2 type, String libraryName, String className) =>
+bool _isTypeAssignableWith(DartType type, String libraryName, String className) =>
     type != null && _isElementAssignableWith(type.element, libraryName, className);
 
-bool _isTypeTypedWith(Type2 type, String libraryName, String className) =>
+bool _isTypeTypedWith(DartType type, String libraryName, String className) =>
     type != null && _isElementTypedWith(type.element, libraryName, className);
 
 bool _isElementAssignableWith(Element element, String libraryName, String className) =>
@@ -394,7 +394,7 @@ void _removeMetadata(List<_Transformation> transformations, AnnotatedNode n, boo
     _removeNode(transformations, a);
   });
 }
-void _removeNode(List<_Transformation> transformations, ASTNode n) {
+void _removeNode(List<_Transformation> transformations, AstNode n) {
   transformations.add(new _Transformation(n.offset, n.endToken.next.offset, ''));
 }
 void _removeToken(List<_Transformation> transformations, Token t) {
