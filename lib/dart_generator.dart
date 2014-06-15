@@ -357,13 +357,14 @@ String _handleReturn(String content, TypeName returnType, List<Annotation> metad
 bool _isTypeTransferable(DartType type) {
   final transferables = <String, List<String>>{
     'dart.core': ['num', 'bool', 'String', 'DateTime'],
-    'dart.dom.html': ['Blob', 'Event', 'ImageData', 'Node', 'Window'],
+    'dart.dom.html': ['Blob', 'Event', 'HtmlCollection', 'ImageData', 'Node', 'NodeList', 'Window'],
     'dart.dom.indexed_db': ['KeyRange'],
     'dart.typed_data': ['TypedData'],
   };
-  for (final libraryName in transferables.keys) {
-    if (transferables[libraryName].any((className) =>
-        _isTypeAssignableWith(type, libraryName, className))) {
+  for (final lib in transferables.keys) {
+    // [ByteBuffer] is not transferable
+    if (!_isTypeAssignableWith(type, 'dart.typed_data', 'ByteBuffer') &&
+        transferables[lib].any((cls) => _isTypeAssignableWith(type, lib, cls))) {
       return true;
     }
   }
